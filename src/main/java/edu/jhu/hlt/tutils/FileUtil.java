@@ -4,7 +4,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.channels.FileChannel;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class FileUtil {
 
@@ -25,4 +29,29 @@ public class FileUtil {
     }
   }
 
+  public static Object deserialize(File f) {
+    Object out = null;
+    try (FileInputStream fis = new FileInputStream(f)) {
+      try (ObjectInputStream oos = f.getName().toLowerCase().endsWith(".gz")
+          ? new ObjectInputStream(new GZIPInputStream(fis))
+          : new ObjectInputStream(fis)) {
+        out = oos.readObject();
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    return out;
+  }
+
+  public static void serialize(Object obj, File f) {
+    try (FileOutputStream fis = new FileOutputStream(f)) {
+      try (ObjectOutputStream oos = f.getName().toLowerCase().endsWith(".gz")
+          ? new ObjectOutputStream(new GZIPOutputStream(fis))
+          : new ObjectOutputStream(fis)) {
+        oos.writeObject(obj);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
 }

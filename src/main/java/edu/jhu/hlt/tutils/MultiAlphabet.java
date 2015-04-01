@@ -24,6 +24,11 @@ import edu.jhu.prim.bimap.IntObjectBimap;
  */
 public class MultiAlphabet {
 
+  /** For things that can produce a pretty string if given an alphabet */
+  public static interface Showable {
+    public String show(MultiAlphabet alph);
+  }
+
   // These can be aliased to each other if isolation is not needed.
   private IntObjectBimap<String> wordAlph = new IntObjectBimap<>();
   private IntObjectBimap<String> posAlph = new IntObjectBimap<>();
