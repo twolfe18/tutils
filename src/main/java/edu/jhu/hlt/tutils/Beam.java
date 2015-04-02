@@ -34,6 +34,18 @@ public interface Beam<T> extends Iterable<T> {
 
   public Iterator<Item<T>> itemIterator();
 
+  /**
+   * Returns the score of the best thing on the beam.
+   * Has undefined behavior if there is nothing on the beam.
+   */
+  public double maxScore();
+
+  /**
+   * Returns the score of the worst thing on the beam.
+   * Has undefined behavior if there is nothing on the beam.
+   */
+  public double minScore();
+
 
 
   default public String show() {
@@ -63,22 +75,27 @@ public interface Beam<T> extends Iterable<T> {
     private T i1, i2, i3, i4;
     private double s1, s2, s3, s4;
     private int size = 0;
+
     @Override
     public Iterator<T> iterator() {
       throw new RuntimeException("implement me");
     }
+
     @Override
     public Iterator<Beam.Item<T>> itemIterator() {
       throw new RuntimeException("implement me");
     }
+
     @Override
     public int size() {
       return size;
     }
+
     @Override
     public int width() {
       return 4;
     }
+
     @Override
     public T pop() {
       assert size > 0;
@@ -92,11 +109,13 @@ public interface Beam<T> extends Iterable<T> {
       size--;
       return r;
     }
+
     @Override
     public T peek() {
       assert size > 0;
       return i1;
     }
+
     @Override
     public Item<T> popItem() {
       assert size > 0;
@@ -110,10 +129,12 @@ public interface Beam<T> extends Iterable<T> {
       size--;
       return i;
     }
+
     @Override
     public Item<T> peekItem() {
       return new Item<>(i1, s1);
     }
+
     @Override
     public boolean push(T item, double score) {
       if (score > s1 || size < 1) {
@@ -152,13 +173,47 @@ public interface Beam<T> extends Iterable<T> {
         return false;
       }
     }
+
     @Override
     public boolean push(Item<T> item) {
       return push(item.item, item.score);
     }
+
     @Override
     public String toString() {
       return show();
+    }
+
+    @Override
+    public double maxScore() {
+      switch (size) {
+      case 0:
+        return Double.NEGATIVE_INFINITY;
+      case 1:
+      case 2:
+      case 3:
+      case 4:
+        return s1;
+      default:
+        throw new IllegalStateException();
+      }
+    }
+    @Override
+    public double minScore() {
+      switch (size) {
+      case 0:
+        return Double.NEGATIVE_INFINITY;
+      case 1:
+        return s1;
+      case 2:
+        return s2;
+      case 3:
+        return s3;
+      case 4:
+        return s4;
+      default:
+        throw new IllegalStateException();
+      }
     }
   }
 
@@ -168,71 +223,99 @@ public interface Beam<T> extends Iterable<T> {
   public static class Beam1<T> implements Beam<T> {
     private T item;
     private double score;
+    private boolean full = false;   // Needed in order to allow null items
+
     @Override
     public Iterator<T> iterator() {
-      if (size() == 0)
+      if (!full)
         return Collections.emptyIterator();
       return Arrays.asList(item).iterator();
     }
+
     @Override
     public Iterator<Beam.Item<T>> itemIterator() {
-      if (size() == 0)
+      if (!full)
         return Collections.emptyIterator();
       return Arrays.asList(new Item<>(item, score)).iterator();
     }
+
     @Override
     public int size() {
-      return item == null ? 0 : 1;
+      return full ? 1 : 0;
     }
+
     @Override
     public int width() {
       return 1;
     }
+
     @Override
     public T pop() {
-      if (size() == 0)
+      if (!full)
         throw new RuntimeException();
       T temp = item;
       item = null;
       return temp;
     }
+
     @Override
     public Beam.Item<T> popItem() {
-      if (size() == 0)
+      if (!full)
         throw new RuntimeException();
       Beam.Item<T> i = new Beam.Item<T>(item, score);
       item = null;
+      full = false;
       return i;
     }
+
     @Override
     public T peek() {
-      if (size() == 0)
+      if (!full)
         throw new RuntimeException();
       return item;
     }
+
     @Override
     public Beam.Item<T> peekItem() {
-      if (size() == 0)
+      if (!full)
         throw new RuntimeException();
       return new Beam.Item<T>(item, score);
     }
+
     @Override
     public boolean push(T item, double score) {
-      if (this.item == null || this.score < score) {
+      if (!full || this.score < score) {
         this.item = item;
         this.score = score;
+        this.full = true;
         return true;
       } else {
         return false;
       }
     }
+
     @Override
     public boolean push(Beam.Item<T> item) {
       return push(item.item, item.score);
     }
+
     @Override
     public String toString() {
       return show();
+    }
+
+    @Override
+    public double maxScore() {
+      if (full)
+        return score;
+      return Double.NEGATIVE_INFINITY;
+    }
+
+    @Override
+    public double minScore() {
+      if (full)
+        return score;
+      return Double.NEGATIVE_INFINITY;
     }
   }
 
@@ -259,6 +342,8 @@ public interface Beam<T> extends Iterable<T> {
       return 0;
     }
 
+    /** You can mutate the item (if you're careful), but you can never change the score */
+    public void setItem(T item) { this.item = item; }
     public T getItem() { return item; }
     public double getScore() { return score; }
   }
@@ -358,6 +443,20 @@ public interface Beam<T> extends Iterable<T> {
     @Override
     public String toString() {
       return show();
+    }
+
+    @Override
+    public double maxScore() {
+      if (beam.isEmpty())
+        return Double.NEGATIVE_INFINITY;
+      return beam.first().getScore();
+    }
+
+    @Override
+    public double minScore() {
+      if (beam.isEmpty())
+        return Double.NEGATIVE_INFINITY;
+      return beam.last().getScore();
     }
   }
 }
