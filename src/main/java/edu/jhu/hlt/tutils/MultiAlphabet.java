@@ -113,6 +113,9 @@ public class MultiAlphabet {
     return r;
   }
 
+  /**
+   * Reads a human-readable form of this alphabet written with serialize.
+   */
   public static MultiAlphabet deserialize(File f) {
     Log.info("reading from " + f.getPath());
     MultiAlphabet a = new MultiAlphabet();
@@ -138,6 +141,9 @@ public class MultiAlphabet {
     return a;
   }
 
+  /**
+   * Writes a human-readable form of this alphabet to a text file.
+   */
   public void serialize(File f) {
     Log.info("writing to " + f.getPath());
     try {

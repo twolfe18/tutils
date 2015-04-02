@@ -24,6 +24,9 @@ public final class Document implements Serializable {
   private int[] wordNocase;
   private int[] pos;
   private int[] lemma;
+  private int[] wnSynset;
+  private int[] bc256;
+  private int[] bc1000;
   private int[] shape;
   private int[] ner;
   private int[] sense;
@@ -132,6 +135,9 @@ public final class Document implements Serializable {
   public int getWordNocase(int tokenIndex) { return wordNocase[tokenIndex]; }
   public int getPos(int tokenIndex) { return pos[tokenIndex]; }
   public int getLemma(int tokenIndex) { return lemma[tokenIndex]; }
+  public int getWnSynset(int tokenIndex) { return wnSynset[tokenIndex]; }
+  public int getBc256(int tokenIndex) { return bc256[tokenIndex]; }
+  public int getBc1000(int tokenIndex) { return bc1000[tokenIndex]; }
   public int getShape(int tokenIndex) { return shape[tokenIndex]; }
   public int getNer(int tokenIndex) { return ner[tokenIndex]; }
   public int getSense(int tokenIndex) { return sense[tokenIndex]; }
@@ -165,6 +171,9 @@ public final class Document implements Serializable {
     wordNocase = copy(wordNocase, numTokens, -1);
     pos = copy(pos, numTokens, -1);
     lemma = copy(lemma, numTokens, -1);
+    wnSynset = copy(wnSynset, numTokens, -1);
+    bc256 = copy(bc256, numTokens, -1);
+    bc1000 = copy(bc1000, numTokens, -1);
     shape = copy(shape, numTokens, -1);
     ner = copy(ner, numTokens, -1);
     sense = copy(sense, numTokens, -1);
@@ -258,6 +267,9 @@ public final class Document implements Serializable {
     public int getWordNocase() { return wordNocase[index]; }
     public int getPos() { return pos[index]; }
     public int getLemma() { return lemma[index]; }
+    public int getWnSynset() { return wnSynset[index]; }
+    public int getBc256() { return bc256[index]; }
+    public int getBc1000() { return bc1000[index]; }
     public int getShape() { return shape[index]; }
     public int getNer() { return ner[index]; }
     public int getSense() { return sense[index]; }
@@ -275,6 +287,9 @@ public final class Document implements Serializable {
     public void setWordNocase(int x) { wordNocase[index] = x; }
     public void setPos(int x) { pos[index] = x; }
     public void setLemma(int x) { lemma[index] = x; }
+    public void setWnSynset(int x) { wnSynset[index] = x; }
+    public void setBc256(int x) { bc256[index] = x; }
+    public void setBc1000(int x) { bc1000[index] = x; }
     public void setShape(int x) { shape[index] = x; }
     public void setNer(int x) { ner[index] = x; }
     public void setSense(int x) { sense[index] = x; }
