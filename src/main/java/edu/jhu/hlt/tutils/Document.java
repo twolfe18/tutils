@@ -262,6 +262,10 @@ public final class Document implements Serializable {
       super(index, 1);
       this.index = index;
     }
+
+    /** Use sparingly */
+    public String getWordStr() { return alph.word(word[index]); }
+
     public int getIndex() { return index; }
     public int getWord() { return word[index]; }
     public int getWordNocase() { return wordNocase[index]; }
