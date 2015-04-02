@@ -30,6 +30,7 @@ public class FileUtil {
   }
 
   public static Object deserialize(File f) {
+    Log.info("reading from " + f.getPath());
     Object out = null;
     try (FileInputStream fis = new FileInputStream(f)) {
       try (ObjectInputStream oos = f.getName().toLowerCase().endsWith(".gz")
@@ -44,11 +45,13 @@ public class FileUtil {
   }
 
   public static void serialize(Object obj, File f) {
+    Log.info("writing to " + f.getPath());
     try (FileOutputStream fis = new FileOutputStream(f)) {
       try (ObjectOutputStream oos = f.getName().toLowerCase().endsWith(".gz")
           ? new ObjectOutputStream(new GZIPOutputStream(fis))
           : new ObjectOutputStream(fis)) {
         oos.writeObject(obj);
+        oos.flush();
       }
     } catch (Exception e) {
       throw new RuntimeException(e);

@@ -113,43 +113,6 @@ public class MultiAlphabet {
     return r;
   }
 
-//  public String show(Token[] mention) {
-//    return show(mention, true);
-//  }
-//  public String show(Token[] mention, boolean terse) {
-//    StringBuilder sb = new StringBuilder();
-//    for (int i = 0; i < mention.length; i++) {
-//      if (i > 0) sb.append(" ");
-//      if (terse)
-//        sb.append(word(mention[i].word));
-//      else
-//        sb.append(show(mention[i]));
-//    }
-//    return sb.toString();
-//  }
-//
-//  public String show(Token t) {
-//    return word(t.word) + "/" + pos(t.pos) + " @ " + t.index;
-//  }
-//
-//  public String show(Constituent c) {
-//    return show(c, null);
-//  }
-//
-//  public String show(Constituent c, Constituent[] all) {
-//    StringBuilder sb = new StringBuilder();
-//    sb.append(cfg(c.lhs) + " =>");
-//    if (all == null) {
-//      sb.append(" ???");
-//    } else {
-//      for (int child : c.children)
-//        sb.append(" " + cfg(all[child].lhs));
-//    }
-//    if (c.leftToken >= 0)
-//      sb.append(" over " + c.leftToken + "-" + c.rightToken);
-//    return sb.toString();
-//  }
-
   public static MultiAlphabet deserialize(File f) {
     Log.info("reading from " + f.getPath());
     MultiAlphabet a = new MultiAlphabet();

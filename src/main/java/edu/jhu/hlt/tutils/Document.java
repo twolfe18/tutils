@@ -17,7 +17,7 @@ public final class Document implements Serializable {
   /* GENERAL FIELDS ***********************************************************/
   private final String id;
   private int index;
-  private MultiAlphabet alph;
+  private transient MultiAlphabet alph;
 
   /* TOKEN-INDEXED FIELDS *****************************************************/
   private int[] word;
@@ -61,8 +61,9 @@ public final class Document implements Serializable {
 
   /* END OF FIELDS ************************************************************/
 
-  public Document(String id, MultiAlphabet alph) {
+  public Document(String id, int index, MultiAlphabet alph) {
     this.id = id;
+    this.index = index;
     this.alph = alph;
   }
 
@@ -88,6 +89,43 @@ public final class Document implements Serializable {
 
   public int numConstituents() {
     return lhs.length;
+  }
+
+  /**
+   * Computes depth by looking at parent
+   */
+  public void computeDepths() {
+    assert depth.length == parent.length;
+    for (int c = 0; c < depth.length; c++) {
+      int depth = 0;
+      int ptr = c;
+      while (ptr >= 0) {
+        depth++;
+        ptr = parent[ptr];
+      }
+      this.depth[c] = depth;
+    }
+  }
+
+  /**
+   * Populates cons_parent by looking at depth, firstToken, and lastToken
+   */
+  public void computeConstituentParents() {
+    assert depth.length == firstToken.length;
+    assert depth.length == lastToken.length;
+    int[] usedDepths = new int[depth.length];
+    for (int c = 0; c < firstToken.length; c++) {
+      int d = depth[c];
+      if (d < 0)
+        throw new IllegalStateException("have to compute depths first");
+      if (d > usedDepths[c]) {
+        usedDepths[c] = d;
+        if (firstToken[c] < 0 || lastToken[c] < 0)
+          throw new IllegalStateException("have to compute firstToken and lastToken first");
+        for (int i = firstToken[c]; i <= lastToken[c]; i++)
+          cons_parent[i] = c;
+      }
+    }
   }
 
   public int getWord(int tokenIndex) { return word[tokenIndex]; }
@@ -152,6 +190,7 @@ public final class Document implements Serializable {
     if (in == null) {
       int[] out = new int[newLength];
       if (pad != 0) Arrays.fill(out, pad);
+      return out;
     }
     if (newLength < in.length)
       throw new IllegalArgumentException();
@@ -179,7 +218,7 @@ public final class Document implements Serializable {
       StringBuilder sb = new StringBuilder();
       for (Token t : getTokens()) {
         if (sb.length() > 0)
-          sb.append('\t');
+          sb.append("  ");
         sb.append(t.show(alph));
       }
       return sb.toString();
@@ -280,7 +319,15 @@ public final class Document implements Serializable {
       update(-1);
     }
 
+    public void setIndex(int tokenIndex) {
+      this.index = tokenIndex;
+      this.sentence = -2;
+      this.paragraph = -2;
+    }
+
     private void update(int delta) {
+      if (!isValid())
+        return;
       if (sentence >= -1 && startsSentence())
         sentence += delta;
       if (paragraph >= -1 && startsParagraph())
@@ -342,8 +389,69 @@ public final class Document implements Serializable {
     public int getWidth() {
       return (lastToken[index] - firstToken[index]) + 1;
     }
+
+    public String showSubtree(MultiAlphabet alph) {
+      ConstituentItr ci = new ConstituentItr(getIndex());
+
+      //String lhs = alph.cfg(ci.getLhs());
+      //Log.info("ci=" + lhs);
+
+      /*
+       * The problem is that not all children may be a mix of terminals and non-terminals!
+       * I have a case of:
+       * NP -> (ADJP NNP NNP)
+       *
+       * in my representation, the one and only child of NP is ADJP, and the
+       * NNPs are not reified.
+       *
+       * The problem is that it seems clear that if you have
+       * NP -> (NNP NNP)
+       * then you don't want to make Constituent nodes for the two children...
+       *
+       * I don't want to have to process trees by checking both their children
+       * as well as their text span!
+       *
+       * Solution: need to include pre-terminals like NNP if there are any
+       * siblings that are not POS tags.
+       * The problem with this is that you still don't receive a uniform treatment
+       * of POS tags... they could be a part of the tree or they could not be...
+       * If I always made them a part of the tree, then I would have a lot of
+       * constituents... but maybe I need to do that.
+       *
+       * => POS tags are the leaves of the tree.
+       */
+
+      StringBuilder sb = new StringBuilder();
+      sb.append('(');
+      sb.append(alph.cfg(ci.getLhs()));
+      if (ci.isLeaf()) {
+        //sb.append('*');
+        for (Token t : ci.getTokens()) {
+          sb.append(' ');
+          sb.append(alph.word(t.getWord()));
+        }
+      } else {
+        //int nc = 0;
+        for (ci.gotoLeftChild(); ci.isValid(); ci.gotoRightSib()) {
+          //Log.info("index2=" + ci.getIndex());
+          sb.append(' ');
+          sb.append(ci.showSubtree(alph));
+          //nc++;
+        }
+        //Log.info(lhs + " has " + nc + " children");
+      }
+      sb.append(')');
+      return sb.toString();
+    }
+
     public boolean isRoot() { return parent[index] < 0; }
     public boolean isLeaf() { return leftChild[index] < 0; }
+    public String getLhsStr() {
+      int cfg = lhs[index];
+      if (cfg < 0)
+        return "???";
+      return alph.cfg(cfg);
+    }
 
     public int getLhs() { return lhs[index]; }
     public int getParent() { return parent[index]; }
@@ -373,15 +481,18 @@ public final class Document implements Serializable {
     public ConstituentItr(int index) {
       super(index);
     }
+    public void forwards() { index++; }
+    public void backwards() { index--; }
     public boolean isValid() { return index >= 0; }
     public void gotoParent() { index = getParent(); }
     public void gotoLeftChild() { index = getLeftChild(); }
     public void gotoRightSib() { index = getRightSib(); }
     public void gotoRightChild() { index = getRightChild(); }
     public void gotoLeftSib() { index = getLeftSib(); }
+    public void gotoConstituent(int constituentIndex) { index = constituentIndex; }
   }
   public ConstituentItr getConstituentItr(int c) {
-    return new ConstituentItr(c);
+    return this.new ConstituentItr(c);
   }
 
   public class Sentence extends Slice {
