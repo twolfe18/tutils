@@ -25,4 +25,12 @@ public class PosUtil {
     assert pos < 64;
     return (mask & (1l << pos)) != 0;
   }
+
+  public boolean isNoun(int pos) {
+    return matches(NOUNS, pos);
+  }
+
+  public boolean isVerb(int pos) {
+    return matches(VERBS, pos);
+  }
 }

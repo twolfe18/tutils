@@ -56,6 +56,8 @@ public class BrownClusters {
 
   /** Populates the bc256 and bc1000 fields using the word field */
   public static void setClusters(Document doc, BrownClusters bc256, BrownClusters bc1000) {
+    if (bc256 == null || bc1000 == null)
+      throw new IllegalArgumentException();
     MultiAlphabet alph = doc.getAlphabet();
     if (alph == null)
       throw new IllegalArgumentException("need an alphabet");
