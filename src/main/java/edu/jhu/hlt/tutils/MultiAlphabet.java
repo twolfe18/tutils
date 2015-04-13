@@ -11,6 +11,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -36,6 +37,7 @@ public class MultiAlphabet {
   private IntObjectBimap<String> shapeAlph = new IntObjectBimap<>();
   private IntObjectBimap<String> featAlph = new IntObjectBimap<>();
   private IntObjectBimap<String> cfgAlph = new IntObjectBimap<>();
+  private IntObjectBimap<String> wnSynsetAlph = new IntObjectBimap<>(); // keys are WordNet synsets (using mit/jwi)
 
   private Map<String, IntObjectBimap<String>> representation() {
     Map<String, IntObjectBimap<String>> m = new HashMap<>();
@@ -113,10 +115,22 @@ public class MultiAlphabet {
     return r;
   }
 
+  public int wnSynset(String wnSynset) {
+    return wnSynsetAlph.lookupIndex(wnSynset, true);
+  }
+  public String wnSynset(int i) {
+    return wnSynsetAlph.lookupObject(i);
+  }
+
   /**
    * Reads a human-readable form of this alphabet written with serialize.
    */
   public static MultiAlphabet deserialize(File f) {
+    if (!f.isFile()) {
+      assert !f.isDirectory();
+      Log.info("returning an empty alphabet because this is not a file: " + f.getPath());
+      return new MultiAlphabet();
+    }
     Log.info("reading from " + f.getPath());
     MultiAlphabet a = new MultiAlphabet();
     try {
@@ -125,12 +139,19 @@ public class MultiAlphabet {
         is = new GZIPInputStream(is);
       try (BufferedReader r = new BufferedReader(new InputStreamReader(is))) {
         Map<String, IntObjectBimap<String>> rep = a.representation();
+        Counts<String> read = new Counts<>();
         while (r.ready()) {
           String[] toks = r.readLine().split("\t");
           assert toks.length == 3;
           IntObjectBimap<String> m = rep.get(toks[0]);
+          read.increment(toks[0]);
           int i = m.lookupIndex(toks[2], true);
           assert i == Integer.parseInt(toks[1]);
+        }
+        // Report on the size and how many were read
+        for (Entry<String, IntObjectBimap<String>> x : a.representation().entrySet()) {
+          int c = read.getCount(x.getKey());
+          Log.info("read=" + c + " entries for class=" + x.getKey() + ", total=" + x.getValue().size());
         }
       } catch (Exception e) {
         throw new RuntimeException(e);

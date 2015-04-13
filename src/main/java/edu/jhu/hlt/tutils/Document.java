@@ -265,6 +265,7 @@ public final class Document implements Serializable {
 
     /** Use sparingly */
     public String getWordStr() { return alph.word(word[index]); }
+    public String getPosStr() { return alph.pos(pos[index]); }
 
     public int getIndex() { return index; }
     public int getWord() { return word[index]; }
