@@ -21,7 +21,8 @@ public class BrownClusters {
   public BrownClusters(File pathToPercyOutput) {
     if (!pathToPercyOutput.isDirectory()) {
       throw new IllegalArgumentException(
-          "should give a path that contains a file called \"path\"");
+          "not a directory: " + pathToPercyOutput.getPath());
+          //"should give a path that contains a file called \"path\"");
     }
     File pathFile = new File(pathToPercyOutput, "paths");
     word2path = new HashMap<>();
@@ -75,14 +76,16 @@ public class BrownClusters {
 
   /** If bcHome is null, will return a relative path */
   public static File bc256dir(File bcHome) {
-    String f = "data/embeddings/bc_out_256/full.txt_en_256/";
+    //String f = "data/embeddings/bc_out_256/full.txt_en_256/";
+    String f = "bc_out_256/full.txt_en_256/";
     if (bcHome == null)
       return new File(f);  // relative
     return new File(bcHome, f);
   }
   /** If bcHome is null, will return a relative path */
   public static File bc1000dir(File bcHome) {
-    String f = "data/embeddings/bc_out_1000/full.txt_en_1000/bc/";
+    //String f = "data/embeddings/bc_out_1000/full.txt_en_1000/bc/";
+    String f = "bc_out_1000/full.txt_en_1000/bc/";
     if (bcHome == null)
       return new File(f);  // relative
     return new File(bcHome, f);
