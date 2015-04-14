@@ -1,11 +1,17 @@
 package edu.jhu.hlt.tutils;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.nio.channels.FileChannel;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -27,6 +33,20 @@ public class FileUtil {
       if (destination != null)
         destination.close();
     }
+  }
+
+  public static BufferedWriter getWriter(File f) throws IOException {
+    OutputStream is = new FileOutputStream(f);
+    if (f.getName().toLowerCase().endsWith(".gz"))
+      is = new GZIPOutputStream(is);
+    return new BufferedWriter(new OutputStreamWriter(is));
+  }
+
+  public static BufferedReader getReader(File f) throws IOException {
+    InputStream is = new FileInputStream(f);
+    if (f.getName().toLowerCase().endsWith(".gz"))
+      is = new GZIPInputStream(is);
+    return new BufferedReader(new InputStreamReader(is));
   }
 
   public static Object deserialize(File f) {

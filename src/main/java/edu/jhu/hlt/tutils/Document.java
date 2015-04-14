@@ -62,6 +62,37 @@ public final class Document implements Serializable {
   public int[] firstToken;  // Document token index, inclusive
   public int[] lastToken;   // Document token index, inclusive
 
+
+
+  // TODO Should the stuff below be folded in with the span/constituent-indexed
+  // fields? I.e. have a very rich "type" field which selects constituent/situation/entity
+  // e.g.:
+  // int[] parent
+  // int[] type     cParse      situation/FN      entity/NER    situation/bSRL
+  // int[] id       SBAR        Commerce_buy      GPE           lemma/predicate
+  // long[] bits    NA          NA                NA            bit-vector
+  // TODO Should I just make separate classes for Situation/Entity until I'm sure...
+//  /* SITUATION-INDEXED FIELDS *************************************************/
+//  public int[] sit_type;        // e.g. FrameNet frame name
+//  public int[] sit_parent;      // may be -1 for arguments
+//  public int[] sit_role;
+//  public int[] sit_tense;
+//  public int[] sit_aspect;
+//  // SRL bits? Confidence? intensity, polarity?
+//  public int[] sit_leftChild;
+//  public int[] sit_rightSib;
+//  public int[] sit_firstToken;
+//  public int[] sit_lastToken;
+//
+//  /* ENTITY-INDEXED FIELDS ****************************************************/
+//  public int[] ent_type;      // e.g. PER/ORG/GPE
+//  public int[] ent_parent;    // may be -1
+//  // Tree structure:
+//  public int[] ent_leftChild;
+//  public int[] ent_rightSib;
+//  public int[] ent_firstToken;
+//  public int[] ent_lastToken;
+
   /* END OF FIELDS ************************************************************/
 
   public Document(String id, int index, MultiAlphabet alph) {
