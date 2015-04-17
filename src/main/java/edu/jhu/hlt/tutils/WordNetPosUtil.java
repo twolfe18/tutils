@@ -9,6 +9,18 @@ public class WordNetPosUtil {
 
   public static boolean pedantic = false;
 
+  public static edu.mit.jwi.item.POS parseWnTag(String wnTag) {
+    if(wnTag.equals("A"))
+      return edu.mit.jwi.item.POS.ADJECTIVE;
+    if(wnTag.equals("R"))
+      return edu.mit.jwi.item.POS.ADVERB;
+    if(wnTag.equals("N"))
+      return edu.mit.jwi.item.POS.NOUN;
+    if(wnTag.equals("V"))
+      return edu.mit.jwi.item.POS.VERB;
+    throw new RuntimeException("illegal wn pos: " + wnTag);
+  }
+
   public static edu.mit.jwi.item.POS ptb2wordNet(String ptbPosTag) {
     if(ptbPosTag.startsWith("J"))
       return edu.mit.jwi.item.POS.ADJECTIVE;

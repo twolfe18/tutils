@@ -4,8 +4,10 @@ package edu.jhu.hlt.tutils;
 public class PosUtil {
 
   public final long VERBS, NOUNS;
+  private MultiAlphabet alph;
 
   public PosUtil(MultiAlphabet alph) {
+    this.alph = alph;
     VERBS = 0
         | (1l << alph.pos("VBD"))
         | (1l << alph.pos("VBG"))
@@ -32,5 +34,9 @@ public class PosUtil {
 
   public boolean isVerb(int pos) {
     return matches(VERBS, pos);
+  }
+
+  public int numPosTags() {
+    return alph.numPos();
   }
 }

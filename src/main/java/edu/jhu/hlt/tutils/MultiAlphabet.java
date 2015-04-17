@@ -28,6 +28,8 @@ import edu.jhu.prim.bimap.IntObjectBimap;
  */
 public class MultiAlphabet {
 
+  public static final String UNKNOWN = "UNKNOWN";
+
   /** For things that can produce a pretty string if given an alphabet */
   public static interface Showable {
     public String show(MultiAlphabet alph);
@@ -77,12 +79,18 @@ public class MultiAlphabet {
   public String pos(int i) {
     return posAlph.lookupObject(i);
   }
+  public int numPos() {
+    return posAlph.size();
+  }
 
   public int ner(String ner) {
     return nerAlph.lookupIndex(ner, true);
   }
   public String ner(int i) {
     return nerAlph.lookupObject(i);
+  }
+  public int numNer() {
+    return nerAlph.size();
   }
 
   public int lemma(String lemma) {
