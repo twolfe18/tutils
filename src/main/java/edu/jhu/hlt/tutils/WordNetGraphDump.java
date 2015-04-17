@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import edu.jhu.jerboa.counting.BloomFilter;
 import edu.mit.jwi.IRAMDictionary;
 import edu.mit.jwi.RAMDictionary;
 import edu.mit.jwi.data.ILoadPolicy;
@@ -39,10 +38,19 @@ public class WordNetGraphDump {
   private IRAMDictionary dict;
   public int maxPathLength = 3;
 
-  private Map<String, BloomFilter> bfs; // keys are relations, values are sets of "<termA> <tab> <termB>"
   private BufferedWriter emitter;
   private int emitCounter = 0;
   public int emitCounterInterval = 500_000;
+
+  // Not very good, mostly "derivationally related forms"
+  // i.e. R("foo", "bar") => emit("foo", "bar", R)
+  public boolean emitRelatedWords = false;
+
+  // i.e. in("foo", ss) & in("bar", ss) => emit("foo", "bar", "synset")
+  public boolean emitSynset = true;
+
+  // i.e. in("foo", ss1) & R(s1, s2) & in("bar", s2) => emit("foo", "bar", "syn/R")
+  public boolean emitRelatedSynsets = true;
 
   /**
    * e.g. /home/hltcoe/twolfe/parma/data/wordnet/rion_snow/dict_400k_cropped
@@ -51,7 +59,7 @@ public class WordNetGraphDump {
   public void load(File dictDir) {
     if (!dictDir.isDirectory())
       throw new IllegalArgumentException("not a WN directory: " + dictDir.getPath());
-    System.out.println("loading from " + dictDir.getPath());
+    System.err.println("loading from " + dictDir.getPath());
     long start = System.currentTimeMillis();
     this.dictDir = dictDir;
     dict = new RAMDictionary(dictDir, ILoadPolicy.IMMEDIATE_LOAD);
@@ -106,12 +114,12 @@ public class WordNetGraphDump {
    * want to hit the resulting file with `sort -u`.
    */
   public void dump(File f) throws IOException {
-    System.out.println("writing to " + f.getPath());
+    System.err.println("writing to " + f.getPath());
     emitter = new BufferedWriter(new FileWriter(f));
     //emitter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(f))));
     List<WordWithRel> path = new ArrayList<>();
     for (POS pos : Arrays.asList(POS.NOUN, POS.VERB, POS.ADJECTIVE, POS.ADVERB)) {
-      System.out.println("working on " + pos);
+      System.err.println("working on " + pos);
       List<String> words = getAllWords(pos);
       for (String w : words) {
         IIndexWord iw = dict.getIndexWord(w, pos);
@@ -139,39 +147,14 @@ public class WordNetGraphDump {
     IWord back = path.size() > 1 ? path.get(path.size() - 2).word : null;
 
     // Related words
-    Map<IPointer, List<IWordID>> m = w.getRelatedMap();
-    for (Entry<IPointer, List<IWordID>> x : m.entrySet()) {
-      String relation = x.getKey().getName();
-      for (IWordID id : x.getValue()) {
-        if (back != null && back.getID().equals(id))
-          continue;
-        IWord w2 = dict.getWord(id);
-        WordWithRel end = new WordWithRel(w2, relation);
-        path.add(end);
-        emit(path);
-        explore(path);
-        path.remove(path.size() - 1);
-      }
-    }
-
-    // Direct synset
-    ISynset ss = w.getSynset();
-    for (IWord w2 : ss.getWords()) {
-      if (w2 == w || w2 == back) continue;
-      WordWithRel end = new WordWithRel(w2, "synonym");
-      path.add(end);
-      emit(path);
-      explore(path);
-      path.remove(path.size() - 1);
-    }
-
-    // Related synsets
-    for (Entry<IPointer, List<ISynsetID>> x : ss.getRelatedMap().entrySet()) {
-      String relation = "syn/" + x.getKey();
-      for (ISynsetID relSsId : x.getValue()) {
-        ISynset relSs = dict.getSynset(relSsId);
-        for (IWord w2 : relSs.getWords()) {
-          if (w2 == w || w2 == back) continue;
+    if (emitRelatedWords) {
+      Map<IPointer, List<IWordID>> m = w.getRelatedMap();
+      for (Entry<IPointer, List<IWordID>> x : m.entrySet()) {
+        String relation = x.getKey().getName();
+        for (IWordID id : x.getValue()) {
+          if (back != null && back.getID().equals(id))
+            continue;
+          IWord w2 = dict.getWord(id);
           WordWithRel end = new WordWithRel(w2, relation);
           path.add(end);
           emit(path);
@@ -180,8 +163,40 @@ public class WordNetGraphDump {
         }
       }
     }
+
+    // Direct synset
+    ISynset ss = w.getSynset();
+    if (emitSynset) {
+      for (IWord w2 : ss.getWords()) {
+        if (w2 == w || w2 == back) continue;
+        WordWithRel end = new WordWithRel(w2, "synonym");
+        path.add(end);
+        emit(path);
+        explore(path);
+        path.remove(path.size() - 1);
+      }
+    }
+
+    // Related synsets
+    if (emitRelatedSynsets) {
+      for (Entry<IPointer, List<ISynsetID>> x : ss.getRelatedMap().entrySet()) {
+        String relation = "syn/" + x.getKey();
+        for (ISynsetID relSsId : x.getValue()) {
+          ISynset relSs = dict.getSynset(relSsId);
+          for (IWord w2 : relSs.getWords()) {
+            if (w2 == w || w2 == back) continue;
+            WordWithRel end = new WordWithRel(w2, relation);
+            path.add(end);
+            emit(path);
+            explore(path);
+            path.remove(path.size() - 1);
+          }
+        }
+      }
+    }
   }
 
+  private String prevEmission = null;
   private void emit(List<WordWithRel> path) {
     if (path.size() < 2)
       throw new IllegalArgumentException();
@@ -197,27 +212,19 @@ public class WordNetGraphDump {
     IWord w2 = path.get(path.size() - 1).word;
 
     // File-based emissions
-//    try {
-//      emitter.write(w1.getID() + "\t" + w2.getID() + "\t" + relations + "\n");
-//    } catch (Exception e) {
-//      throw new RuntimeException(e);
-//    }
-
-    // Bloom-filter based emissions
-    String relStr = relations.toString();
-    BloomFilter bf = bfs.get(relStr);
-    if (bf == null) {
-      try {
-        bf = new BloomFilter(1_000_000, 500);
-      } catch (Exception e) {
-        throw new RuntimeException("what were you thinking Ben?", e);
-      }
-      bfs.put(relStr, bf);
+    try {
+      String emission = w1.getSynset().getID()
+          + "\t" + w2.getSynset().getID()
+          + "\t" + relations + "\n";
+      if (!emission.equals(prevEmission))   // uniq
+        emitter.write(emission);
+      prevEmission = emission;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
-    bf.set(w1 + "\t" + w2);
 
     if (++emitCounter % emitCounterInterval == 0)
-      System.out.println("emitted " + emitCounter + " triples");
+      System.err.println("emitted " + emitCounter + " triples");
   }
 
   public int numEmitted() {
@@ -239,6 +246,6 @@ public class WordNetGraphDump {
     gd.dump(new File(args[1]));
     gd.close();
     long time = System.currentTimeMillis() - start;
-    System.out.println("emitted " + gd.numEmitted() + " triples in " + (time/1000d) + " seconds");
+    System.err.println("emitted " + gd.numEmitted() + " triples in " + (time/1000d) + " seconds");
   }
 }
