@@ -87,7 +87,11 @@ public interface Adjoints {
 
     @Override
     public void backwards(double dErr_dForwards) {
-      throw new RuntimeException("implement me");
+      // Ideally I would fuse these operations, but I don't think this can be
+      // done without runtime type inspection.
+      IntDoubleVector update = features.copy();
+      update.scale(-dErr_dForwards);
+      theta.add(update);
     }
 
     /**
