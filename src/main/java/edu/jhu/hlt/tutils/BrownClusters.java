@@ -71,8 +71,28 @@ public class BrownClusters {
     }
   }
 
-  public static final File bcHomeLaptop = new File("/home/travis/code/fnparse/");
-  public static final File bcHomeGrid = new File("/home/hltcoe/twolfe/fnparse/");
+  public static final File bcHomeLaptop = new File("/home/travis/code/fnparse/data/embeddings");
+  public static final File bcHomeGrid = new File("/home/hltcoe/twolfe/fnparse/data/embeddings");
+
+  public static File bc256dirAuto() {
+    File f = bc256dir(null);
+    if (f.isDirectory()) return f;
+    f = bc256dir(bcHomeGrid);
+    if (f.isDirectory()) return f;
+    f = bc256dir(bcHomeLaptop);
+    if (f.isDirectory()) return f;
+    throw new RuntimeException("couldn't find it");
+  }
+
+  public static File bc1000dirAuto() {
+    File f = bc1000dir(null);
+    if (f.isDirectory()) return f;
+    f = bc1000dir(bcHomeGrid);
+    if (f.isDirectory()) return f;
+    f = bc1000dir(bcHomeLaptop);
+    if (f.isDirectory()) return f;
+    throw new RuntimeException("couldn't find it");
+  }
 
   /** If bcHome is null, will return a relative path */
   public static File bc256dir(File bcHome) {
