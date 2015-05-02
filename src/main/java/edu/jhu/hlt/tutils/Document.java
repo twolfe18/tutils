@@ -59,10 +59,11 @@ public final class Document implements Serializable {
   // a Document which selects one of them.
   // TODO Crap: Stanford col and colcc dependencies are only guaranteed to be
   // directed graphs, which can'be be represented this way...
-  private int[] dep_parent;
-  private int[] dep_label;
+  private int[] dep_parent;   // value is a token index
+  private int[] dep_label;    // value is an edge/label type
 
-  // Constituency parse info
+  // Constituency parse info: value is constituent index of the deepest
+  // constituent which dominates this token.
   // NOTE: Note about multiple dependency parses is true here too: will need to
   // add another index which ranges over parses. Constituent class will add this
   // as another index.

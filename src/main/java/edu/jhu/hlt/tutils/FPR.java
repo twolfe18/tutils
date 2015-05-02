@@ -33,6 +33,10 @@ public final class FPR {
     return tp + fn;
   }
 
+  public double tpPlusFpPlusFn() {
+    return tp + fp + fn;
+  }
+
   public void accum(double tp, double fp, double fn) {
     if(tp < 0d || fp < 0d || fn < 0d)
       throw new IllegalArgumentException();
@@ -126,7 +130,9 @@ public final class FPR {
 
   @Override
   public String toString() {
-    return String.format("<%s F1=%.1f P=%.1f R=%.1f>",
-        macro ? "Macro" : "Micro", 100*f1(), 100*precision(), 100*recall());
+    return String.format("<%s F1=%.1f P=%.1f (%.1f/%.1f) R=%.1f (%.1f/%.1f)>",
+        macro ? "Macro" : "Micro", 100*f1(),
+            100*precision(), pSum, pZ,
+            100*recall(), rSum, rZ);
   }
 }
