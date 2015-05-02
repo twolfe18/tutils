@@ -3,6 +3,9 @@ package edu.jhu.hlt.tutils;
 import java.util.Arrays;
 import java.util.BitSet;
 
+import edu.jhu.hlt.concrete.Dependency;
+import edu.jhu.hlt.concrete.DependencyParse;
+
 /**
  * Adjacency list style graph representation.
  *
@@ -40,6 +43,8 @@ public class LabeledDirectedGraph {
     this.edges = edges;
     this.splitPoints = splitPoints;
   }
+
+  public LabeledDirectedGraph() {}
 
   public int getNumEdges() {
     return edges.length;
@@ -229,5 +234,16 @@ public class LabeledDirectedGraph {
   public static int unpackConode(long edge) {
     long mask = (1l << TOKEN_INDEX_BITS) - 1;
     return (int) (edge & mask);
+  }
+
+  public static LabeledDirectedGraph fromConcrete(DependencyParse p, MultiAlphabet alph) {
+    LabeledDirectedGraph.Builder g = new LabeledDirectedGraph().new Builder();
+    // TODO check p is 0-indexed
+    // TODO warn if p is tree
+    for (Dependency d : p.getDependencyList()) {
+      int e = alph.dep(d.getEdgeType());
+      g.add(d.getGov(), d.getDep(), e);
+    }
+    return g.freeze();
   }
 }
