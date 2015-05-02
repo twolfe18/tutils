@@ -19,11 +19,35 @@ public class LabeledDirectedGraph {
   // 16 bits for edge label
   // 24 bits for conode index
   // Index is not important, but edges must be sorted (in the order given by the bit readout).
+  // NOTE: edge label uses the highest bit for the direction of the edge.
+  // 1 indicates conode->node (conode is parent) and 0 indicates node->conode (conode is child)
   private long[] edges;
 
   // Index is a token index, value is the first index in edges s.t. the edge
   // label direction is node -> conode.
   private int[] splitPoints;
+
+  /**
+   * If you already have the data from another LabeledDirectedGraph, you can
+   * use this 0-cost constructor. Otherwise use the Builder class.
+   *
+   * @param splitPoints can be null, in which case this constructor will compute
+   * the split points.
+   */
+  public LabeledDirectedGraph(long[] edges, int[] splitPoints) {
+    if (splitPoints == null)
+      splitPoints = computeSplitPoints(edges);
+    this.edges = edges;
+    this.splitPoints = splitPoints;
+  }
+
+  public int getNumEdges() {
+    return edges.length;
+  }
+
+  public int getNumNodes() {
+    return splitPoints.length;
+  }
 
   /**
    * Pointer to a node in the graph with the ability to give parents and children.
@@ -34,13 +58,9 @@ public class LabeledDirectedGraph {
     private int numParents;
     private int numChildren;
 
-    /* TODO Clarify if you should be taking node or split. Make consistent.
-     */
-    public Node(int split) {
-      assert split >= 0 && split < splitPoints.length;
-      this.split = split;
-      long edge = edges[split];
-      this.node = unpackNode(edge);
+    public Node(int nodeIndex) {
+      this.node = nodeIndex;
+      this.split = splitPoints[nodeIndex];
       this.numParents = -1;
       this.numChildren = -1;
     }
@@ -128,14 +148,16 @@ public class LabeledDirectedGraph {
       splitPoints = null;
     }
 
-    public void add(int node, int edge, int conode) {
+    public void add(int parent, int child, int edgeLabel) {
+      if (top < 0)
+        throw new RuntimeException("you can't add after freeze!");
       // Check to make sure edges is big enough
-      if (top >= edges.length) {
-        int newSize = (int) (edges.length * 1.6 + 1.5);
+      if (top >= edges.length - 1) {
+        int newSize = (int) (edges.length * 1.6 + 2.5);
         edges = Arrays.copyOf(edges, newSize);
       }
-      edges[top] = pack(node, edge, conode);
-      top++;
+      edges[top++] = pack(parent, edgeLabel, child, true);
+      edges[top++] = pack(child, edgeLabel, parent, false);
     }
 
     public LabeledDirectedGraph freeze() {
@@ -150,6 +172,9 @@ public class LabeledDirectedGraph {
 
       // Compute splitPoints
       splitPoints = computeSplitPoints(edges);
+
+      // Disallow future adds
+      top = -1;
 
       return LabeledDirectedGraph.this;
     }
@@ -177,10 +202,14 @@ public class LabeledDirectedGraph {
     return splitPoints;
   }
 
-  public static long pack(int node, int edge, int conode) {
+  private static long pack(int node, int edge, int conode, boolean nodeIsParentOfConode) {
     assert node < (1 << TOKEN_INDEX_BITS);
     assert edge < (1 << EDGE_LABEL_BITS);
     assert conode < (1 << TOKEN_INDEX_BITS);
+    if (!nodeIsParentOfConode) {
+      assert (edge >> EDGE_LABEL_BITS) == 0;
+      edge |= 1 << EDGE_LABEL_BITS;
+    }
     long p = node;
     p = (p << EDGE_LABEL_BITS) ^ edge;
     p = (p << TOKEN_INDEX_BITS) ^ conode;
