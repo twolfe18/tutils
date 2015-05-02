@@ -43,6 +43,7 @@ public class MultiAlphabet {
   private IntObjectBimap<String> featAlph = new IntObjectBimap<>();
   private IntObjectBimap<String> cfgAlph = new IntObjectBimap<>();
   private IntObjectBimap<String> wnSynsetAlph = new IntObjectBimap<>(); // keys are WordNet synsets (using mit/jwi)
+  private IntObjectBimap<String> depAlph = new IntObjectBimap<>();  // keys are dependency edge labels
 
   private Map<String, IntObjectBimap<String>> representation() {
     Map<String, IntObjectBimap<String>> m = new HashMap<>();
@@ -53,6 +54,7 @@ public class MultiAlphabet {
     m.put("feat", featAlph);
     m.put("cfg", cfgAlph);
     m.put("wnSynset", wnSynsetAlph);
+    m.put("dep", depAlph);
     return m;
   }
 
@@ -132,6 +134,13 @@ public class MultiAlphabet {
   }
   public String wnSynset(int i) {
     return wnSynsetAlph.lookupObject(i);
+  }
+
+  public int dep(String dependencyArcLabel) {
+    return depAlph.lookupIndex(dependencyArcLabel, true);
+  }
+  public String dep(int i) {
+    return depAlph.lookupObject(i);
   }
 
   /**
