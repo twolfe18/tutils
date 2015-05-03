@@ -91,17 +91,22 @@ public class LabeledDirectedGraph {
 
   public String toString(MultiAlphabet alph) {
     StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < getNumEdges(); i++) {
-      long e = getEdge(i);
-      int node = unpackNode(e);
-      int edge = unpackEdge(e);
-      int conode = unpackConode(e);
-      if (unpackDirection(e))
-        sb.append(String.format("%d->%d %s\n", node, conode, alph.dep(edge)));
-      else
-        sb.append(String.format("%d<-%d %s\n", node, conode, alph.dep(edge)));
-    }
+    for (int i = 0; i < getNumEdges(); i++)
+      sb.append(showEdge(getEdge(i), alph));
     return sb.toString();
+  }
+
+  public static String showEdge(long edge) {
+    return showEdge(edge, null);
+  }
+  public static String showEdge(long edge, MultiAlphabet alph) {
+    int node = unpackNode(edge);
+    int conode = unpackConode(edge);
+    String e = alph == null ? ""+unpackEdge(edge) : alph.dep(unpackEdge(edge));
+    if (unpackDirection(edge))
+      return String.format("%d->%d %s\n", node, conode, e);
+    else
+      return String.format("%d<-%d %s\n", node, conode, e);
   }
 
   /**
@@ -120,13 +125,22 @@ public class LabeledDirectedGraph {
       this.numChildren = -1;
     }
 
+    public String toString() {
+      return String.format("<Node %d sp=%d #parent=%d #child=%d>",
+          node, split, numParents(), numChildren());
+    }
+
     public int numParents() {
       if (numParents < 0) {
         numParents = 0;
         for (int i = split - 1; i >= 0; i--) {
           int n = unpackNode(edges[i]);
-          if (n == node)
+          if (n == node) {
+            assert !unpackDirection(edges[i]);
             numParents++;
+          } else {
+            break;
+          }
         }
       }
       return numParents;
@@ -158,10 +172,14 @@ public class LabeledDirectedGraph {
     public int numChildren() {
       if (numChildren < 0) {
         numChildren = 0;
-        for (int i = split; i < edges.length; i++) {
+        for (int i = split; i >= 0 && i < edges.length; i++) {
           int n = unpackNode(edges[i]);
-          if (n == node)
+          if (n == node) {
             numChildren++;
+            assert unpackDirection(edges[i]);
+          } else {
+            break;
+          }
         }
       }
       return numChildren;
@@ -383,7 +401,6 @@ grep -P '^\d+\D{2}\d+ \S+|Dependency' -n /tmp/LabeledDirectedGraph.log | head -n
 384:11->2 root
    */
   public static void testDeps() throws ConcreteException, IOException {
-    MultiAlphabet alph = new MultiAlphabet();
     File f = new File("/home/travis/code/schema-challenge/features/framenet/data/train.concrete.tgz");
     TarGzCompactCommunicationSerializer ts = new TarGzCompactCommunicationSerializer();
     Iterator<Communication> itr = ts.fromTarGz(Files.newInputStream(f.toPath()));
@@ -394,22 +411,57 @@ grep -P '^\d+\D{2}\d+ \S+|Dependency' -n /tmp/LabeledDirectedGraph.log | head -n
           Tokenization t = sentence.getTokenization();
           int n = t.getTokenList().getTokenListSize();
           for (DependencyParse p : t.getDependencyParseList()) {
-            String tool = p.getMetadata().getTool();
-            if (tool.toLowerCase().contains("basic"))
-              continue;
-            System.out.println("parse: " + tool);
-            // Dependencies according to Concrete
-            for (Dependency d : p.getDependencyList())
-              System.out.println(d);
-            System.out.println();
-            // Dependencies according to LabeledDirectedGraph
-            LabeledDirectedGraph g = LabeledDirectedGraph.fromConcrete(p, n, alph);
-            System.out.println(g.toString(alph));
-            System.out.println();
+            printEdges(p, n);
+            testTraversals(p, n);
           }
         }
       }
     }
+  }
+
+  public static void testTraversals(DependencyParse p, int n) {
+    // Print according to Concrete
+    for (Dependency d : p.getDependencyList())
+      System.out.println(d);
+
+    MultiAlphabet alph = new MultiAlphabet();
+    LabeledDirectedGraph g = LabeledDirectedGraph.fromConcrete(p, n, alph);
+
+    // Take random paths up the graph
+    Random r = new Random(9001);
+    Node node = g.getNode(r.nextInt(g.getNumNodes()));
+    while (node.numParents() > 0) {
+      System.out.println(node + " UP");
+      int pi = r.nextInt(node.numParents());
+      System.out.println(showEdge(node.getParentEdge(pi), alph));
+      node.gotoParentNode(pi);
+    }
+
+    // Take random paths down the graph
+    node = g.getNode(r.nextInt(g.getNumNodes()));
+    while (node.numChildren() > 0) {
+      System.out.println(node + " DOWN");
+      int pi = r.nextInt(node.numChildren());
+      System.out.println(showEdge(node.getChildEdge(pi), alph));
+      node.gotoChildNode(pi);
+    }
+  }
+
+  /** Shows the edges according to Concrete as well as the ingested form */
+  public static void printEdges(DependencyParse p, int n) {
+    MultiAlphabet alph = new MultiAlphabet();
+    String tool = p.getMetadata().getTool();
+    if (tool.toLowerCase().contains("basic"))
+      return;
+    System.out.println("parse: " + tool);
+    // Dependencies according to Concrete
+    for (Dependency d : p.getDependencyList())
+      System.out.println(d);
+    System.out.println();
+    // Dependencies according to LabeledDirectedGraph
+    LabeledDirectedGraph g = LabeledDirectedGraph.fromConcrete(p, n, alph);
+    System.out.println(g.toString(alph));
+    System.out.println();
   }
 
   public static String putDashesEvery(String bin, int n) {
