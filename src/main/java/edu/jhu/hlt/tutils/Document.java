@@ -9,26 +9,8 @@ import java.util.List;
  * More or less the CoNLL format in memory, with some other influences which
  * keep things very tabular.
  *
- * TODO Solution to dependency graph (non-tree) representation:
-   use order below (left=high order, right=low order) and just sort!
-   long[] edges;             // 24 bits for node index, 1 bit for edge direction (neighbor is gov vs dep), 12 bits for edge type, 24 bits for neighbor node index, 3 bits wasted
-   int[] node_split_points;  // index is token, value is first index in edges s.t. edge direction is out of node (left of this position will be parents, this+right will be children)
-
-   Traversals happen by a Node class which points to an index into edges
-   - it gets a linear scan to determine both parents and children
-   - this gives you a local view of the graph, which is the best you can hope for
-
-   Shortest path queries:
-   - general tool for shortest path given two endpoints: http://en.wikipedia.org/wiki/Bidirectional_search
-   - may be faster to just do Dijkstra twice, each time going in the "parent" direction (near-trees will have branching factor of 1)
-     make sure you use the fibonacci heap version: http://people.cs.kuleuven.be/~jon.sneyers/presentations/dijkstra_chr.pdf
-   - LOOPS?!
-     just keep a bitset around for these algorithms to detect loops
-
-   All path queries:
-   - similar algorithms as above, but you need to keep a stack of nodes from source with you
-     always read from the stack (when you complete a path, need to copy the whole thing off)
-     on exploration out of a node, can push/pop on items on/off the stack to just use one stack (avoid copying)
+ * TODO Add dependency graphs for collapsed dependency representations.
+ * @see edu.jhu.hlt.tutils.LabeledDirectedGraph
  *
  * @author travis
  */

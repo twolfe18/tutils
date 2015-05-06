@@ -20,6 +20,19 @@ import edu.jhu.hlt.concrete.util.ConcreteException;
 /**
  * Adjacency list style graph representation.
  *
+ * TODO: Add the following
+   Shortest path queries:
+   - general tool for shortest path given two endpoints: http://en.wikipedia.org/wiki/Bidirectional_search
+   - may be faster to just do Dijkstra twice, each time going in the "parent" direction (near-trees will have branching factor of 1)
+     make sure you use the fibonacci heap version: http://people.cs.kuleuven.be/~jon.sneyers/presentations/dijkstra_chr.pdf
+   - LOOPS?!
+     just keep a bitset around for these algorithms to detect loops
+
+   All path queries:
+   - similar algorithms as above, but you need to keep a stack of nodes from source with you
+     always read from the stack (when you complete a path, need to copy the whole thing off)
+     on exploration out of a node, can push/pop on items on/off the stack to just use one stack (avoid copying)
+ *
  * @author travis
  */
 public class LabeledDirectedGraph {

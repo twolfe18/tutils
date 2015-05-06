@@ -30,6 +30,9 @@ public interface Beam<T> extends Iterable<T> {
    */
   public boolean push(T item, double score);
 
+  /**
+   * Returns true if this item was added to the beam.
+   */
   public boolean push(Beam.Item<T> item);
 
   public Iterator<Item<T>> itemIterator();
