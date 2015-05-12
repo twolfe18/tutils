@@ -66,8 +66,10 @@ public class BrownClusters {
     for (int i = 0; i < n; i++) {
       Token t = doc.getToken(i);
       String ws = t.getWordStr();
-      t.setBc256(alph.shape(bc256.getPath(ws)));
-      t.setBc1000(alph.shape(bc1000.getPath(ws)));
+      if (bc256 != null)
+        t.setBc256(alph.shape(bc256.getPath(ws)));
+      if (bc1000 != null)
+        t.setBc1000(alph.shape(bc1000.getPath(ws)));
     }
   }
 

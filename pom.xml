@@ -54,6 +54,11 @@
       <artifactId>jerboa</artifactId>
       <version>1.0.6</version>
     </dependency>
+    <dependency>
+      <groupId>edu.jhu.hlt</groupId>
+      <artifactId>concrete-conll</artifactId>
+      <version>1.0.0</version>
+    </dependency>
   </dependencies>
 
   <build>
