@@ -3,11 +3,15 @@ package edu.jhu.hlt.tutils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 
 /**
  * More or less the CoNLL format in memory, with some other influences which
  * keep things very tabular.
+ *
+ * TODO figure out a scheme by which we can de-allocate some of these token
+ * indexed fields (e.g. checking if all the values are -2, then set to null).
  *
  * TODO Add dependency graphs for collapsed dependency representations.
  * @see edu.jhu.hlt.tutils.LabeledDirectedGraph
@@ -16,23 +20,47 @@ import java.util.List;
  */
 public final class Document implements Serializable {
   private static final long serialVersionUID = 1L;
+  public static final int UNINITIALIZED = -2;
 
   /* GENERAL FIELDS ***********************************************************/
-  private final String id;
-  private int index;
+  final String id;
+  int index;
   private transient MultiAlphabet alph;
 
+  /* GRAPHS *******************************************************************/
+  // A note on graphs:
+  // One goal was to be able to have a Token which is just an index into the
+  // document and be able to do a multi-graph traversal from just that int.
+  // Constituency trees force use to have another type of index due to the
+  // non-token-indexedness of constituents, but graphs go one step further
+  // due to the unknown number of parents. I may try to fold in the adjacency
+  // list style representation used in LabeledDirectedGraph into Document to be
+  // flat and easy to use, but I have to work out how to do this later. TODO
+
+  // Actually I think this is pretty easy:
+  // Only need two fields: long[] edges and int[] splitPoints.
+  // Just need to absorb LabeledDirectedGraph.Node into this class as GraphNode or something.
+  // Maybe have a single long[] edges and many int[] splitPoints, one for each
+  // parse type?
+
+  // See http://nlp.stanford.edu/software/dependencies_manual.pdf
+  LabeledDirectedGraph stanfordDepsCollapsed;
+  LabeledDirectedGraph stanfordDepsCollapsedCC;
+
+  // See http://universaldependencies.github.io/docs/u/overview/syntax.html
+  LabeledDirectedGraph universalDependencies;
+
   /* TOKEN-INDEXED FIELDS *****************************************************/
-  private int[] word;
-  private int[] wordNocase;
-  private int[] pos;
-  private int[] lemma;
-  private int[] wnSynset;
-  private int[] bc256;
-  private int[] bc1000;
-  private int[] shape;
-  private int[] ner;
-  private int[] sense;
+  int[] word;
+  int[] wordNocase;
+  int[] pos;
+  int[] lemma;
+  int[] wnSynset;
+  int[] bc256;
+  int[] bc1000;
+  int[] shape;
+  int[] ner;
+  int[] sense;
 
   // Dependency parse info
   // NOTE: When this module is expanded to allow multiple dependency parses, we
@@ -41,32 +69,74 @@ public final class Document implements Serializable {
   // a Document which selects one of them.
   // TODO Crap: Stanford col and colcc dependencies are only guaranteed to be
   // directed graphs, which can'be be represented this way...
-  private int[] dep_parent;   // value is a token index
-  private int[] dep_label;    // value is an edge/label type
+  int[] dep_parent;   // value is a token index
+  int[] dep_label;    // value is an edge/label type
 
   // Constituency parse info: value is constituent index of the deepest
   // constituent which dominates this token.
   // NOTE: Note about multiple dependency parses is true here too: will need to
   // add another index which ranges over parses. Constituent class will add this
   // as another index.
-  private int[] cons_parent;
+//  int[] cons_parent;
+
+  // The index of a constituency tree node immediately dominated by this token.
+  // May be -1 for constituency trees that don't cover the entire span.
+  // Constituents have an implicit type, which is which one of these fields you
+  // got the constituent from
+  int[] cons_parent_ptb_gold;
+  int[] cons_parent_ptb_auto;
+  int[] cons_parent_propbank_gold;
+  int[] cons_parent_propbank_auto;
+  int[] cons_parent_ner_gold;
+  int[] cons_parent_ner_auto;
+
+  public static enum ConstituentType {
+    PTB_GOLD,
+    PTB_AUTO,
+    PROPBANK_GOLD,
+    PROPBANK_AUTO,
+    NER_GOLD,
+    NER_AUTO,
+  }
+  // Sort of arbitrary that this is flat vs a 2d array...
+  public int[] getConsParent(ConstituentType consType) {
+    switch (consType) {
+      case PTB_GOLD:
+        return cons_parent_ptb_gold;
+      case PTB_AUTO:
+        return cons_parent_ptb_auto;
+      case PROPBANK_GOLD:
+        return cons_parent_propbank_gold;
+      case PROPBANK_AUTO:
+        return cons_parent_propbank_auto;
+      case NER_GOLD:
+        return cons_parent_ner_gold;
+      case NER_AUTO:
+        return cons_parent_ner_auto;
+      default:
+        throw new RuntimeException("consType=" + consType);
+    }
+  }
 
   // First tokens of paragraphs and sentences
-  private int[] breaks;
+  int[] breaks;
 
   /* CONSTITUENT-INDEXED FIELDS ***********************************************/
-  public int[] lhs;     // left hand side of a CFG rule, e.g. "NP" or "SBAR", NOT a POS tag (that would mean 1 Constituent per word, we want to stay one level higher than that)
-  public int[] parent;  // Constituent index, -1 for roots
+  // NEW: type is implicit from whether you got this constituent from
+  // cons_parent_ptb_auto vs cons_parent_propbank_gold, etc.
+//  int[] cons_type;    // Used to say things like what parser generated this.
+  int[] lhs;          // left hand side of a CFG rule, e.g. "NP" or "SBAR", NOT a POS tag (that would mean 1 Constituent per word, we want to stay one level higher than that)
 
-  public int[] leftChild;   // < 0 for leaf nodes
-  public int[] rightSib;
+  int[] leftChild;    // < 0 for leaf nodes
+  int[] rightSib;
 
   // Things below this line need not be saved (can be re-derived)
-  public int[] rightChild;  // < 0 for leaf nodes
-  public int[] leftSib;
-  public int[] depth;
-  public int[] firstToken;  // Document token index, inclusive
-  public int[] lastToken;   // Document token index, inclusive
+  int[] parent;       // Constituent index, -1 for roots
+  int[] rightChild;   // < 0 for leaf nodes
+  int[] leftSib;
+  int[] depth;
+  int[] firstToken;   // Document token index, inclusive
+  int[] lastToken;    // Document token index, inclusive
 
 
 
@@ -150,10 +220,11 @@ public final class Document implements Serializable {
   /**
    * Populates cons_parent by looking at depth, firstToken, and lastToken
    */
-  public void computeConstituentParents() {
+  public void computeConstituentParents(ConstituentType consType) {
     assert depth.length == firstToken.length;
     assert depth.length == lastToken.length;
     int[] usedDepths = new int[depth.length];
+    int[] consParent = getConsParent(consType);
     for (int c = 0; c < firstToken.length; c++) {
       int d = depth[c];
       if (d < 0)
@@ -163,7 +234,7 @@ public final class Document implements Serializable {
         if (firstToken[c] < 0 || lastToken[c] < 0)
           throw new IllegalStateException("have to compute firstToken and lastToken first");
         for (int i = firstToken[c]; i <= lastToken[c]; i++)
-          cons_parent[i] = c;
+          consParent[i] = c;
       }
     }
   }
@@ -183,11 +254,24 @@ public final class Document implements Serializable {
   public int getSense(int tokenIndex) { return sense[tokenIndex]; }
   public int getDepParent(int tokenIndex) { return dep_parent[tokenIndex]; }
   public int getDepLabel(int tokenIndex) { return dep_label[tokenIndex]; }
-  public int getConstituentParent(int tokenIndex) { return cons_parent[tokenIndex]; }
   public int getBreak(int tokenIndex) { return breaks[tokenIndex]; }
 
-  public boolean isRoot(int constitIndex) { return parent[constitIndex] < 0; }
-  public boolean isLeaf(int constitIndex) { return leftChild[constitIndex] < 0; }
+  public int getConstituentParentIndex(int tokenIndex, ConstituentType consType) {
+    return getConsParent(consType)[tokenIndex];
+  }
+  public Constituent getConstituentParent(int tokenIndex, ConstituentType consType) {
+    return this.new Constituent(getConstituentParentIndex(tokenIndex, consType));
+  }
+
+  public boolean isRoot(int constitIndex) {
+    assert parent[constitIndex] != UNINITIALIZED;
+    return parent[constitIndex] < 0;
+  }
+  public boolean isLeaf(int constitIndex) {
+    assert leftChild[constitIndex] != UNINITIALIZED;
+    return leftChild[constitIndex] < 0;
+  }
+
   public int getWidth(int constitIndex) {
     return (lastToken[constitIndex] - firstToken[constitIndex]) + 1;
   }
@@ -207,30 +291,36 @@ public final class Document implements Serializable {
     if (numConstituents < 0)
       throw new IllegalArgumentException();
 
-    word = copy(word, numTokens, -1);
-    wordNocase = copy(wordNocase, numTokens, -1);
-    pos = copy(pos, numTokens, -1);
-    lemma = copy(lemma, numTokens, -1);
-    wnSynset = copy(wnSynset, numTokens, -1);
-    bc256 = copy(bc256, numTokens, -1);
-    bc1000 = copy(bc1000, numTokens, -1);
-    shape = copy(shape, numTokens, -1);
-    ner = copy(ner, numTokens, -1);
-    sense = copy(sense, numTokens, -1);
-    dep_parent = copy(dep_parent, numTokens, -1);
-    dep_label = copy(dep_label, numTokens, -1);
-    cons_parent = copy(cons_parent, numTokens, -1);
-    breaks = copy(breaks, numTokens, -1);
+    word = copy(word, numTokens, UNINITIALIZED);
+    wordNocase = copy(wordNocase, numTokens, UNINITIALIZED);
+    pos = copy(pos, numTokens, UNINITIALIZED);
+    lemma = copy(lemma, numTokens, UNINITIALIZED);
+    wnSynset = copy(wnSynset, numTokens, UNINITIALIZED);
+    bc256 = copy(bc256, numTokens, UNINITIALIZED);
+    bc1000 = copy(bc1000, numTokens, UNINITIALIZED);
+    shape = copy(shape, numTokens, UNINITIALIZED);
+    ner = copy(ner, numTokens, UNINITIALIZED);
+    sense = copy(sense, numTokens, UNINITIALIZED);
+    dep_parent = copy(dep_parent, numTokens, UNINITIALIZED);
+    dep_label = copy(dep_label, numTokens, UNINITIALIZED);
+    breaks = copy(breaks, numTokens, UNINITIALIZED);
 
-    lhs = copy(lhs, numConstituents, -1);
-    parent = copy(parent, numConstituents, -1);
-    leftChild = copy(leftChild, numConstituents, -1);
-    rightSib = copy(rightSib, numConstituents, -1);
-    rightChild = copy(rightChild, numConstituents, -1);
-    leftSib = copy(leftSib, numConstituents, -1);
-    depth = copy(depth, numConstituents, -1);
-    firstToken = copy(firstToken, numConstituents, -1);
-    lastToken = copy(lastToken, numConstituents, -1);
+    cons_parent_ptb_gold = copy(cons_parent_ptb_gold, numTokens, UNINITIALIZED);
+    cons_parent_ptb_auto = copy(cons_parent_ptb_auto, numTokens, UNINITIALIZED);
+    cons_parent_propbank_gold = copy(cons_parent_propbank_gold, numTokens, UNINITIALIZED);
+    cons_parent_propbank_auto = copy(cons_parent_propbank_auto, numTokens, UNINITIALIZED);
+    cons_parent_ner_gold = copy(cons_parent_ner_gold, numTokens, UNINITIALIZED);
+    cons_parent_ner_auto = copy(cons_parent_ner_auto, numTokens, UNINITIALIZED);
+
+    lhs = copy(lhs, numConstituents, UNINITIALIZED);
+    parent = copy(parent, numConstituents, UNINITIALIZED);
+    leftChild = copy(leftChild, numConstituents, UNINITIALIZED);
+    rightSib = copy(rightSib, numConstituents, UNINITIALIZED);
+    rightChild = copy(rightChild, numConstituents, UNINITIALIZED);
+    leftSib = copy(leftSib, numConstituents, UNINITIALIZED);
+    depth = copy(depth, numConstituents, UNINITIALIZED);
+    firstToken = copy(firstToken, numConstituents, UNINITIALIZED);
+    lastToken = copy(lastToken, numConstituents, UNINITIALIZED);
   }
 
   public static int[] copy(int[] in, int newLength, int pad) {
@@ -262,6 +352,15 @@ public final class Document implements Serializable {
         tokens.add(getToken(start + w));
       return tokens;
     }
+    /**
+     * Give a RELATIVE index rather than document-wide index.
+     *
+     * For example, if this slice is from tokens [5,10) and you call getToken(2)
+     * you will get the 7th token.
+     */
+    public Token getToken(int i) {
+      return getToken(getStart() + i);
+    }
     @Override
     public String show(MultiAlphabet alph) {
       StringBuilder sb = new StringBuilder();
@@ -282,6 +381,9 @@ public final class Document implements Serializable {
       this.start = start;
       this.width = width;
     }
+    public MultiAlphabet getAlphabet() {
+      return Document.this.alph;
+    }
     @Override
     public int getStart() {
       return start;
@@ -300,6 +402,8 @@ public final class Document implements Serializable {
     protected int index;
     public Token(int index) {
       super(index, 1);
+      if (index == UNINITIALIZED)
+        throw new IllegalArgumentException();
       this.index = index;
     }
 
@@ -320,14 +424,26 @@ public final class Document implements Serializable {
     public int getSense() { return sense[index]; }
     public int getDepParent() { return dep_parent[index]; }
     public int getDepLabel() { return dep_label[index]; }
-    public int getConstituentParent() { return cons_parent[index]; }
     public int getBreak() { return breaks[index]; }
+
+    public int getConstituentParentIndex(ConstituentType consType) {
+      return Document.this.getConstituentParentIndex(index, consType);
+    }
+    public Constituent getConstituentParent(ConstituentType consType) {
+      return Document.this.getConstituentParent(index, consType);
+    }
+
     public boolean startsSentence() {
-      return breaks[index] == Sentence.BREAK_LEVEL;
+      return breaks[index] >= Sentence.BREAK_LEVEL;
     }
     public boolean startsParagraph() {
-      return breaks[index] == Paragraph.BREAK_LEVEL;
+      return breaks[index] >= Paragraph.BREAK_LEVEL;
     }
+
+    public void setConstituentParent(int x, ConstituentType consType) {
+      Document.this.getConsParent(consType)[index] = x;
+    }
+
     public void setWord(int x) { word[index] = x; }
     public void setWordNocase(int x) { wordNocase[index] = x; }
     public void setPos(int x) { pos[index] = x; }
@@ -340,7 +456,7 @@ public final class Document implements Serializable {
     public void setSense(int x) { sense[index] = x; }
     public void setDepParent(int x) { dep_parent[index] = x; }
     public void setDepLabel(int x) { dep_label[index] = x; }
-    public void setConstituentParent(int x) { cons_parent[index] = x; }
+
     public void setBreak(int x) { breaks[index] = x; }
     public void setBreakSafe(int x) {
       if (x > breaks[index])
@@ -436,6 +552,8 @@ public final class Document implements Serializable {
     // NOTE: When this module is expanded to allow multiple constituency parses,
     // we will need to add a int[] constituents here.
     public Constituent(int index) {
+      if (index == UNINITIALIZED)
+        throw new IllegalArgumentException();
       this.index = index;
     }
     public int getIndex() {
@@ -504,8 +622,15 @@ public final class Document implements Serializable {
       return sb.toString();
     }
 
-    public boolean isRoot() { return parent[index] < 0; }
-    public boolean isLeaf() { return leftChild[index] < 0; }
+    public boolean isRoot() {
+      assert parent[index] != UNINITIALIZED;
+      return parent[index] < 0;
+    }
+    public boolean isLeaf() {
+      assert leftChild[index] != UNINITIALIZED;
+      return leftChild[index] < 0;
+    }
+
     public String getLhsStr() {
       int cfg = lhs[index];
       if (cfg < 0)
@@ -514,7 +639,6 @@ public final class Document implements Serializable {
     }
 
     public int getLhs() { return lhs[index]; }
-    public int getParent() { return parent[index]; }
     public int getLeftChild() { return leftChild[index]; }
     public int getRightSib() { return rightSib[index]; }
     public int getRightChild() { return rightChild[index]; }
@@ -522,6 +646,9 @@ public final class Document implements Serializable {
     public int getDepth() { return depth[index]; }
     public int getFirstToken() { return firstToken[index]; }
     public int getLastToken() { return lastToken[index]; }
+
+    public int getParentIndex() { return parent[index]; }
+    public Constituent getParent() { return new Constituent(parent[index]); }
 
     public void setLhs(int x) { lhs[index] = x; }
     public void setParent(int x) { parent[index] = x; }
@@ -544,7 +671,7 @@ public final class Document implements Serializable {
     public void forwards() { index++; }
     public void backwards() { index--; }
     public boolean isValid() { return index >= 0; }
-    public void gotoParent() { index = getParent(); }
+    public void gotoParent() { index = getParentIndex(); }
     public void gotoLeftChild() { index = getLeftChild(); }
     public void gotoRightSib() { index = getRightSib(); }
     public void gotoRightChild() { index = getRightChild(); }
@@ -568,6 +695,32 @@ public final class Document implements Serializable {
     public final int breakLevel = BREAK_LEVEL;
     public Paragraph(int start, int length) {
       super(start, length);
+    }
+  }
+
+  public Iterator<Sentence> getSentences() {
+    return this.new SentenceItr();
+  }
+  public class SentenceItr implements Iterator<Sentence> {
+    // Index into breaks corresponding to the start of a sentence.
+    // If there are no remaining sentences it will be -1.
+    private int next = 0;
+    @Override
+    public boolean hasNext() {
+      return next >= 0;
+    }
+    @Override
+    public Sentence next() {
+      int r = next;
+      int length = 0;
+      for (int i = next + 1; i < breaks.length; i++) {
+        length++;
+        if (breaks[i] >= Sentence.BREAK_LEVEL) {
+          next = i;
+          break;
+        }
+      }
+      return Document.this.new Sentence(r, length);
     }
   }
 }
