@@ -1,5 +1,6 @@
 package edu.jhu.hlt.tutils;
 
+import java.io.File;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,6 +16,8 @@ import edu.jhu.hlt.concrete.TokenTagging;
 import edu.jhu.hlt.concrete.Tokenization;
 import edu.jhu.hlt.concrete.UUID;
 import edu.mit.jwi.IRAMDictionary;
+import edu.mit.jwi.RAMDictionary;
+import edu.mit.jwi.data.ILoadPolicy;
 import edu.mit.jwi.item.IIndexWord;
 import edu.mit.jwi.item.ISynsetID;
 import edu.mit.jwi.item.IWordID;
@@ -236,4 +239,20 @@ public class ConcreteIO {
 
     return doc;
   }
+
+  public static ConcreteIO makeInstance() {
+    File bcParent = new File("/home/travis/code/fnparse/data/embeddings");
+    BrownClusters bc256 = new BrownClusters(BrownClusters.bc256dir(bcParent));
+    BrownClusters bc1000 = new BrownClusters(BrownClusters.bc1000dir(bcParent));
+    File wnDictDir = new File("data/wordnet/dict/");
+    IRAMDictionary wnDict = new RAMDictionary(wnDictDir, ILoadPolicy.IMMEDIATE_LOAD);
+    try {
+      wnDict.open();
+    } catch(Exception e) {
+      throw new RuntimeException(e);
+    }
+    ConcreteIO io = new ConcreteIO(bc256, bc1000, wnDict);
+    return io;
+  }
+
 }
