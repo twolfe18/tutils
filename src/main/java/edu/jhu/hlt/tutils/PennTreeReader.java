@@ -2,6 +2,7 @@ package edu.jhu.hlt.tutils;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
@@ -14,7 +15,62 @@ import java.util.List;
 public class PennTreeReader {
 
   /**
-   * Wraps a segment of an S-expression (glorified start and end).
+   * The Node class (basic tree) does not provide indexing of leaf nodes by
+   * their order. This class builds a map from "token position" => "leaf node".
+   * This is useful for Propbank-style node references, which are a pair (t,h)
+   * where t is the terminal index (or "token position") and h is the height up
+   * the tree.
+   */
+  public static class Indexer {
+    private Node[] leaves;
+    private Node[] byId;
+    private int leafId;
+
+    public Indexer(Node root) {
+      this.leafId = 0;
+      preorder(root);
+    }
+
+    private void preorder(Node n) {
+      visit(n);
+      for (Node c : n.getChildren())
+        preorder(c);
+    }
+
+    private void visit(Node n) {
+      double growth = 1.6;
+
+      // Update leaves
+      if (n.isLeaf()) {
+        if (leafId >= leaves.length) {
+          // Grow
+          int size = (int) (leaves.length * growth + 1);
+          leaves = Arrays.copyOf(leaves, size);
+        }
+        leaves[leafId] = n;
+        leafId++;
+      }
+
+      // Update byId
+      if (n.id >= byId.length) {
+        // Grow
+        int size = (int) (Math.max(n.id, byId.length * growth) + 1);
+        byId = Arrays.copyOf(byId, size);
+      }
+      byId[n.id] = n;
+    }
+
+    public Node get(int terminal, int height) {
+      Node n = leaves[terminal];
+      for (int i = 0; i < height; i++)
+        n = byId[n.getParent()];
+      return n;
+    }
+  }
+
+  /**
+   * Wraps a segment of an S-expression (glorified string slice which knows
+   * that its contents are another S-expression).
    */
   public static final class Node {
 
@@ -35,6 +91,10 @@ public class PennTreeReader {
       this.end = -2;
     }
 
+    /**
+     * Get character index into source string of start of this S-expression.
+     * Must be set first.
+     */
     public int getStart() {
       return start;
     }
@@ -42,6 +102,10 @@ public class PennTreeReader {
       this.start = start;
     }
 
+    /**
+     * Get character index into source string of end of this S-expression.
+     * Must be set first.
+     */
     public int getEnd() {
       return end;
     }
@@ -49,6 +113,9 @@ public class PennTreeReader {
       this.end = end;
     }
 
+    /**
+     * Get the (int) id of the parent node.
+     */
     public int getParent() {
       return parent;
     }
@@ -79,6 +146,9 @@ public class PennTreeReader {
       children.add(n);
     }
 
+    /**
+     * Must have called addChild first.
+     */
     public List<Node> getChildren() {
       if (children == null)
         return Collections.emptyList();
