@@ -28,6 +28,8 @@ public class PennTreeReader {
 
     public Indexer(Node root) {
       this.leafId = 0;
+      this.leaves = new Node[16];
+      this.byId = new Node[16];
       preorder(root);
     }
 
@@ -60,11 +62,31 @@ public class PennTreeReader {
       byId[n.id] = n;
     }
 
+    public Node getById(int id) {
+      return byId[id];
+    }
+
     public Node get(int terminal, int height) {
       Node n = leaves[terminal];
       for (int i = 0; i < height; i++)
         n = byId[n.getParent()];
       return n;
+    }
+
+    public List<Node> getLeaves(boolean includeTraces) {
+      List<Node> leaves = new ArrayList<>();
+      boolean sawNull = false;
+      for (int i = 0; i < this.leaves.length; i++) {
+        Node n = this.leaves[i];
+        if (sawNull)
+          assert n == null;
+        if (n == null) {
+          sawNull = true;
+        } else if (includeTraces || !n.getCategory().equals("-NONE-")) {
+          leaves.add(n);
+        }
+      }
+      return leaves;
     }
   }
 
@@ -165,6 +187,19 @@ public class PennTreeReader {
         throw new IllegalStateException();
       return source.substring(start + 1, i);
     }
+
+    /** Checks if this is a trace node by seeing if the category is "-NONE-" */
+    public boolean isTrace() {
+      return getCategory().equals("-NONE-");
+    }
+
+    /** If this is a leaf token, returns the word at this node */
+    public String getWord() {
+      if (!isLeaf())
+        throw new RuntimeException("you can only call this on leaves");
+      int i = source.indexOf(' ', start);
+      return source.substring(i + 1, end);
+    }
   }
 
 
@@ -214,8 +249,8 @@ public class PennTreeReader {
           break;
       }
     }
-
-    return addTo.get(addTo.size() - 1);
+    // Root is the last node completed
+    return complete.get(complete.size() - 1);
   }
 
   // Sanity check
