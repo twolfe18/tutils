@@ -663,6 +663,11 @@ public final class Document implements Serializable {
     public void setDepth(int x) { depth[index] = x; }
     public void setFirstToken(int x) { firstToken[index] = x; }
     public void setLastToken(int x) { lastToken[index] = x; }
+
+    public void setOnlyChild(int x) {
+      leftChild[index] = x;
+      rightChild[index] = x;
+    }
   }
   public Constituent getConstituent(int c) {
     return this.new Constituent(c);
@@ -672,15 +677,54 @@ public final class Document implements Serializable {
     public ConstituentItr(int index) {
       super(index);
     }
-    public void forwards() { index++; }
-    public void backwards() { index--; }
+
+    /** Returns the constituent index before the update is applied */
+    public int forwards() {
+      int old = index;
+      index++;
+      return old;
+    }
+
+    /** Returns the constituent index before the update is applied */
+    public int backwards() {
+      int old = index;
+      index--;
+      return old;
+    }
+
     public boolean isValid() { return index >= 0; }
-    public void gotoParent() { index = getParentIndex(); }
-    public void gotoLeftChild() { index = getLeftChild(); }
-    public void gotoRightSib() { index = getRightSib(); }
-    public void gotoRightChild() { index = getRightChild(); }
-    public void gotoLeftSib() { index = getLeftSib(); }
-    public void gotoConstituent(int constituentIndex) { index = constituentIndex; }
+
+    /** Returns the constituent index before the update is applied */
+    public int gotoParent() {
+      return gotoConstituent(getParentIndex());
+    }
+
+    /** Returns the constituent index before the update is applied */
+    public int gotoLeftChild() {
+      return gotoConstituent(getLeftChild());
+    }
+
+    /** Returns the constituent index before the update is applied */
+    public int gotoRightSib() {
+      return gotoConstituent(getRightSib());
+    }
+
+    /** Returns the constituent index before the update is applied */
+    public int gotoRightChild() {
+      return gotoConstituent(getRightChild());
+    }
+
+    /** Returns the constituent index before the update is applied */
+    public int gotoLeftSib() {
+      return gotoConstituent(getLeftSib());
+    }
+
+    /** Returns the constituent index before the update is applied */
+    public int gotoConstituent(int constituentIndex) {
+      int old = index;
+      index = constituentIndex;
+      return old;
+    }
   }
   public ConstituentItr getConstituentItr(int c) {
     return this.new ConstituentItr(c);
