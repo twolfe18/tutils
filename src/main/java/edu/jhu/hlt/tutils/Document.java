@@ -85,8 +85,33 @@ public final class Document implements Serializable {
   // got the constituent from
   int[] cons_parent_ptb_gold;
   int[] cons_parent_ptb_auto;
+
+  // Propbank is represented as a list of predicate/argument nodes, each having
+  // a `lhs` field specifying if it is e.g. "throw-v-1" (for a predicate) or
+  // "ARG1" (for an argument). Each of these nodes has a single child, which is
+  // either a real constituency node (which may be a part of another tree and
+  // have a different parent) or a dummy span only created for the purpose of
+  // specifying a span of text.
+  // In this list of pred/arg nodes, the predicates come first. If an argument
+  // is split (e.g. "ARG3" and "C-ARG3"), the the continuation argument must
+  // immediately follow the continued role. Predicate nodes may also be split
+  // (and should appear first and next to each other) in principle, but some
+  // code may assume this never happens...
+  // The nodes in this list will have a common parent denoting a proposition.
+  // TODO Choose the parent/sibling structure of these proposition nodes. Could
+  // 1) make them all siblings with a dummy root or 2) make propositions in the
+  // same sentence siblings and insert a sentence level parent. I'm leaning
+  // towards (1) in the name of remaining flat and leaving the document
+  // structure up to the breaks field.
+  // THESE ARRAYS are used to serve as a pointer from *predicate tokens* up to
+  // predicate nodes. All tokens which do not trigger a predicate will have the
+  // value -1. The reason this field is not used for arguments as well is that
+  // a token may serve in multiple arguments (probably not in the same
+  // proposition, but in different propositions in the same sentence).
   int[] cons_parent_propbank_gold;
   int[] cons_parent_propbank_auto;
+
+  // TODO Clarify these. I had planned to support hierarchical NER.
   int[] cons_parent_ner_gold;
   int[] cons_parent_ner_auto;
 
@@ -139,35 +164,14 @@ public final class Document implements Serializable {
   int[] lastToken;    // Document token index, inclusive
 
 
+  // TODO The working plan for {@link Situation}s and {@link Entity}s is to put
+  // them in as constituency trees. See the description of how Propbank is
+  // encoded for an example of how this can work. The only issue that may come
+  // up is how to fit all of the needed information into `lhs`. Maybe adding
+  // a field (int or long) would solve the problem. If we need a lot more bits
+  // than that, then I may have to give up on the simplicity of uniform
+  // constituency trees.
 
-  // TODO Should the stuff below be folded in with the span/constituent-indexed
-  // fields? I.e. have a very rich "type" field which selects constituent/situation/entity
-  // e.g.:
-  // int[] parent
-  // int[] type     cParse      situation/FN      entity/NER    situation/bSRL
-  // int[] id       SBAR        Commerce_buy      GPE           lemma/predicate
-  // long[] bits    NA          NA                NA            bit-vector
-  // TODO Should I just make separate classes for Situation/Entity until I'm sure...
-//  /* SITUATION-INDEXED FIELDS *************************************************/
-//  public int[] sit_type;        // e.g. FrameNet frame name
-//  public int[] sit_parent;      // may be -1 for arguments
-//  public int[] sit_role;
-//  public int[] sit_tense;
-//  public int[] sit_aspect;
-//  // SRL bits? Confidence? intensity, polarity?
-//  public int[] sit_leftChild;
-//  public int[] sit_rightSib;
-//  public int[] sit_firstToken;
-//  public int[] sit_lastToken;
-//
-//  /* ENTITY-INDEXED FIELDS ****************************************************/
-//  public int[] ent_type;      // e.g. PER/ORG/GPE
-//  public int[] ent_parent;    // may be -1
-//  // Tree structure:
-//  public int[] ent_leftChild;
-//  public int[] ent_rightSib;
-//  public int[] ent_firstToken;
-//  public int[] ent_lastToken;
 
   /* END OF FIELDS ************************************************************/
 
