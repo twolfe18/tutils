@@ -22,15 +22,39 @@ public class PennTreeReader {
    * the tree.
    */
   public static class Indexer {
+
+    private Node root;
     private Node[] leaves;
     private Node[] byId;
-    private int leafId;
+    private int numLeaves;
+    private int numNodes;
+
+    // first and last token index with respect to the list of leaf nodes,
+    // including traces
+    private int[] first;
+    private int[] last;
 
     public Indexer(Node root) {
-      this.leafId = 0;
+      this.root = root;
+      this.numLeaves = 0;
+      this.numNodes = 0;
       this.leaves = new Node[16];
       this.byId = new Node[16];
       preorder(root);
+
+      this.first = new int[byId.length];
+      this.last = new int[byId.length];
+      Arrays.fill(this.first, byId.length + 1);
+      Arrays.fill(this.last, -1);
+      for (int tok = 0; tok < leaves.length; tok++) {
+        // Go from this leaf node up to root and update first/last tokens
+        for (Node cur = leaves[tok]; cur != null; cur = byId[cur.getParent()]) {
+          first[cur.id] = Math.min(first[cur.id], tok);
+          last[cur.id] = Math.max(last[cur.id], tok);
+          if (cur.getParent() < 0)
+            break;
+        }
+      }
     }
 
     private void preorder(Node n) {
@@ -41,16 +65,17 @@ public class PennTreeReader {
 
     private void visit(Node n) {
       double growth = 1.6;
+      numNodes++;
 
       // Update leaves
       if (n.isLeaf()) {
-        if (leafId >= leaves.length) {
+        if (numLeaves >= leaves.length) {
           // Grow
           int size = (int) (leaves.length * growth + 1);
           leaves = Arrays.copyOf(leaves, size);
         }
-        leaves[leafId] = n;
-        leafId++;
+        leaves[numLeaves] = n;
+        numLeaves++;
       }
 
       // Update byId
@@ -60,6 +85,36 @@ public class PennTreeReader {
         byId = Arrays.copyOf(byId, size);
       }
       byId[n.id] = n;
+    }
+
+    public Node getRoot() {
+      return root;
+    }
+
+    /**
+     * Returns the index (in the list of leaf nodes *including traces*) of the
+     * first node that this node dominates.
+     */
+    public int getFirstToken(PennTreeReader.Node node) {
+      assert first[node.id] < byId.length;
+      return first[node.id];
+    }
+
+    /**
+     * Returns the index (in the list of leaf nodes *including traces*) of the
+     * last node that this node dominates.
+     */
+    public int getLastToken(PennTreeReader.Node node) {
+      assert last[node.id] >= 0;
+      return last[node.id];
+    }
+
+    public int getNumLeaves() {
+      return numLeaves;
+    }
+
+    public int getNumNodes() {
+      return numNodes;
     }
 
     public Node getById(int id) {
@@ -148,6 +203,31 @@ public class PennTreeReader {
     @Override
     public String toString() {
       return "<Node id=" + id + " parent=" + parent + " start=" + start + " end=" + end + ">";
+    }
+
+    public String getTreeString() {
+      StringBuilder sb = new StringBuilder();
+      getTreeString(this, "", sb);
+      return sb.toString();
+    }
+
+    private static void getTreeString(Node n,  String prefix, StringBuilder addTo) {
+      if (n.isLeaf()) {
+        addTo.append(prefix);
+        addTo.append("(" + n.id + " " + n.getCategory() + " " + n.getWord() + ")");
+      } else {
+        addTo.append(prefix);
+        addTo.append("(" + n.id + " " + n.getCategory() + "\n");
+        String newPrefix = prefix + "  ";
+        int C = n.getChildren().size();
+        for (int i = 0; i < C; i++) {
+          getTreeString(n.getChildren().get(i), newPrefix, addTo);
+          if (i < C - 1)
+            addTo.append('\n');
+          else
+            addTo.append(')');
+        }
+      }
     }
 
     public String getContents() {
