@@ -20,6 +20,7 @@ import java.util.List;
  */
 public final class Document implements Serializable {
   private static final long serialVersionUID = 1L;
+  public static final int NONE = -1;
   public static final int UNINITIALIZED = -2;
 
   /* GENERAL FIELDS ***********************************************************/
@@ -206,7 +207,8 @@ public final class Document implements Serializable {
   }
 
   /**
-   * Computes depth by looking at parent
+   * Computes depth by traversing the parent pointer to root for every
+   * constituent node.
    */
   public void computeDepths() {
     assert depth.length == parent.length;
@@ -218,28 +220,6 @@ public final class Document implements Serializable {
         ptr = parent[ptr];
       }
       this.depth[c] = depth;
-    }
-  }
-
-  /**
-   * Populates cons_parent by looking at depth, firstToken, and lastToken
-   */
-  public void computeConstituentParents(ConstituentType consType) {
-    assert depth.length == firstToken.length;
-    assert depth.length == lastToken.length;
-    int[] usedDepths = new int[depth.length];
-    int[] consParent = getConsParent(consType);
-    for (int c = 0; c < firstToken.length; c++) {
-      int d = depth[c];
-      if (d < 0)
-        throw new IllegalStateException("have to compute depths first");
-      if (d > usedDepths[c]) {
-        usedDepths[c] = d;
-        if (firstToken[c] < 0 || lastToken[c] < 0)
-          throw new IllegalStateException("have to compute firstToken and lastToken first");
-        for (int i = firstToken[c]; i <= lastToken[c]; i++)
-          consParent[i] = c;
-      }
     }
   }
 
@@ -289,10 +269,12 @@ public final class Document implements Serializable {
   public int getFirstToken(int constitIndex) { return firstToken[constitIndex]; }
   public int getLastToken(int constitIndex) { return lastToken[constitIndex]; }
 
-  public void reserve(int numTokens, int numConstituents) {
+  /**
+   * Ensures that there are at least numTokens tokens. Only call this with
+   * numTokens > the current number of tokens.
+   */
+  public void reserveTokens(int numTokens) {
     if (numTokens <= 0)
-      throw new IllegalArgumentException();
-    if (numConstituents < 0)
       throw new IllegalArgumentException();
 
     word = copy(word, numTokens, UNINITIALIZED);
@@ -315,7 +297,15 @@ public final class Document implements Serializable {
     cons_parent_propbank_auto = copy(cons_parent_propbank_auto, numTokens, UNINITIALIZED);
     cons_parent_ner_gold = copy(cons_parent_ner_gold, numTokens, UNINITIALIZED);
     cons_parent_ner_auto = copy(cons_parent_ner_auto, numTokens, UNINITIALIZED);
+  }
 
+  /**
+   * Ensures that there are at least numConstituents constituents. If called
+   * with 0, constituent fields will be de-allocated.
+   */
+  public void reserveConstituents(int numConstituents) {
+    if (numConstituents < 0)
+      throw new IllegalArgumentException();
     lhs = copy(lhs, numConstituents, UNINITIALIZED);
     parent = copy(parent, numConstituents, UNINITIALIZED);
     leftChild = copy(leftChild, numConstituents, UNINITIALIZED);
@@ -673,15 +663,35 @@ public final class Document implements Serializable {
     return this.new Constituent(c);
   }
 
+  /**
+   * A class for traversing and adding constituents.
+   */
   public class ConstituentItr extends Constituent {
+    // Whether the forwards method should allow constituent fields to be re-allocated
+    private boolean allowExpansion;
+
     public ConstituentItr(int index) {
       super(index);
+      allowExpansion = false;
+    }
+
+    public boolean allowExpansion() {
+      return allowExpansion;
+    }
+
+    public void allowExpansion(boolean flag) {
+      this.allowExpansion = flag;
     }
 
     /** Returns the constituent index before the update is applied */
     public int forwards() {
       int old = index;
       index++;
+      if (allowExpansion && index >= lhs.length) {
+        double rate = 1.6;
+        int newSize = (int) (rate * lhs.length + 1);
+        Document.this.reserveConstituents(newSize);
+      }
       return old;
     }
 

@@ -162,7 +162,7 @@ public class ConcreteIO {
       if (old != null) throw new RuntimeException();
     }
 
-    // Set the children and sibling links
+    // Set parent, left/right children, and left/right sibling
     Document d = cons.getDocument();
     for (edu.jhu.hlt.concrete.Constituent ccon : p.getConstituentList()) {
       int parentIdx = ccon2dcon[ccon.getId()];
@@ -189,7 +189,7 @@ public class ConcreteIO {
       Communication c, int docIndex, MultiAlphabet alph) {
 
     // Count the number of tokens and constituents
-    int numToks = 0, numCons = 0;
+    int numToks = 0;  //, numCons = 0;
     Map<UUID, Integer> tokenizationUUID_to_tokenOffset = new HashMap<>();
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
@@ -198,17 +198,17 @@ public class ConcreteIO {
         Integer i = tokenizationUUID_to_tokenOffset.put(tkz.getUuid(), numToks);
         if (i != null) throw new RuntimeException();
 
-        Parse p = findByTool(tkz.getParseList(), consParseToolName);
+//        Parse p = findByTool(tkz.getParseList(), consParseToolName);
         numToks += tkz.getTokenList().getTokenListSize();
-        numCons += p.getConstituentListSize();
+//        numCons += p.getConstituentListSize();
       }
     }
     // Reserve space for Propbank SRL constituents
-    if (this.propbankSrlToolName != null) {
-      SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), propbankSrlToolName);
-      for (SituationMention sm : sms.getMentionList())
-        numCons += sm.getArgumentListSize() + 1;
-    }
+//    if (this.propbankSrlToolName != null) {
+//      SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), propbankSrlToolName);
+//      for (SituationMention sm : sms.getMentionList())
+//        numCons += sm.getArgumentListSize() + 1;
+//    }
     /*
      * Figuring out how many constituents are needed for this ahead of time is
      * not practical. Especially since the fact that split predicates (but
@@ -217,9 +217,12 @@ public class ConcreteIO {
 
     // Build the Document
     Document doc = new Document(c.getId(), docIndex, alph);
-    doc.reserve(numToks, numCons);
+    doc.reserveTokens(numToks);
+    //doc.reserveConstituents(numCons);
+    doc.reserveConstituents(numToks); // a conservative guess
     Document.TokenItr token = doc.getTokenItr(0);
     Document.ConstituentItr constituent = doc.getConstituentItr(0);
+    constituent.allowExpansion(true);
     Map<ConstituentRef, Integer> constituentIndices = new HashMap<>();
     for (Section s : c.getSectionList()) {
       token.setBreakSafe(Document.Paragraph.BREAK_LEVEL);
@@ -251,9 +254,12 @@ public class ConcreteIO {
       }
     }
 
+    // Compute some derived values in Document
+    doc.computeDepths();
+
     // For debugging
-    DocumentTester test = new DocumentTester(doc, true);
-    assert test.firstAndLastTokensValid();
+//    DocumentTester test = new DocumentTester(doc, true);
+//    assert test.firstAndLastTokensValid();
 
     // Add Propbank SRL
     if (this.propbankSrlToolName != null) {
@@ -316,9 +322,7 @@ public class ConcreteIO {
       }
     }
 
-    // Compute some derived values in Document
-    doc.computeDepths();
-    doc.computeConstituentParents(Document.ConstituentType.PTB_GOLD);
+    // Compute BrownClusters
     if (bc256 != null || bc1000 != null)
       BrownClusters.setClusters(doc, bc256, bc1000);
 
@@ -350,8 +354,17 @@ public class ConcreteIO {
       int tokenOffset = tokenizationUUID_to_tokenOffset.get(trs.getTokenizationId());
       int s = tokenOffset + min(trs.getTokenIndexList());
       int e = tokenOffset + max(trs.getTokenIndexList());
-      // Insert dummy constituent/span?
-      throw new RuntimeException("implement me");
+      // Insert dummy constituent/span
+      constituent.setFirstToken(s);
+      constituent.setLastToken(e);
+      constituent.setLeftSib(Document.NONE);
+      constituent.setRightSib(Document.NONE);
+      constituent.setOnlyChild(Document.NONE);
+      int dummySpan = constituent.forwards();
+      constituent.setOnlyChild(dummySpan);
+      int parent = constituent.gotoConstituent(dummySpan);
+      constituent.setParent(parent);
+      constituent.gotoConstituent(parent);
     }
     assert constituent.getLeftChild() == constituent.getRightChild();
     constituent.setFirstToken(doc.getFirstToken(constituent.getLeftChild()));
