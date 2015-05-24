@@ -72,11 +72,16 @@ public class ConcreteIO {
     this.wnDict = wordNet;
   }
 
-  // TODO Split these into separate methods
-  public void setTools(String posToolName, String nerToolName, String consParseToolName) {
-    this.posToolName = posToolName;
-    this.nerToolName = nerToolName;
-    this.consParseToolName = consParseToolName;
+  public void setNerToolName(String toolName) {
+    this.nerToolName = toolName;
+  }
+
+  public void setPosToolName(String toolName) {
+    this.posToolName = toolName;
+  }
+
+  public void setConstituencyParseToolname(String toolName) {
+    this.consParseToolName = toolName;
   }
 
   public void setPropbankToolname(String toolName) {
@@ -97,13 +102,15 @@ public class ConcreteIO {
     assert ct.isSetText();
     String w = ct.getText();
     token.setWord(alph.word(w));
-    token.setPos(alph.pos(pos.getTaggedTokenList().get(tokenIdx).getTag()));
-    token.setNer(alph.ner(ner.getTaggedTokenList().get(tokenIdx).getTag()));
+    if (pos != null)
+      token.setPos(alph.pos(pos.getTaggedTokenList().get(tokenIdx).getTag()));
+    if (ner != null)
+      token.setNer(alph.ner(ner.getTaggedTokenList().get(tokenIdx).getTag()));
     token.setWordNocase(alph.word(w.toLowerCase()));
     token.setShape(alph.shape(WordShape.wordShape(w)));
 
     // WordNet synset id
-    if (wnDict != null) {
+    if (wnDict != null && pos != null) {
       token.setWnSynset(alph.wnSynset(MultiAlphabet.UNKNOWN));
       edu.mit.jwi.item.POS wnPos = WordNetPosUtil.ptb2wordNet(token.getPosStr());
       if (wnPos != null) {
@@ -196,6 +203,17 @@ public class ConcreteIO {
         numCons += p.getConstituentListSize();
       }
     }
+    // Reserve space for Propbank SRL constituents
+    if (this.propbankSrlToolName != null) {
+      SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), propbankSrlToolName);
+      for (SituationMention sm : sms.getMentionList())
+        numCons += sm.getArgumentListSize() + 1;
+    }
+    /*
+     * Figuring out how many constituents are needed for this ahead of time is
+     * not practical. Especially since the fact that split predicates (but
+     * continuous) may be added as only a TokenRefSequence without a ConstituentRef.
+     */
 
     // Build the Document
     Document doc = new Document(c.getId(), docIndex, alph);
@@ -211,12 +229,20 @@ public class ConcreteIO {
         int tokenOffset = token.getIndex();
         if (debug) Log.info("tokenOffset=" + tokenOffset);
         Tokenization tkz = ss.getTokenization();
-        TokenTagging pos = findByTool(tkz.getTokenTaggingList(), posToolName);
-        TokenTagging ner = findByTool(tkz.getTokenTaggingList(), nerToolName);
+
+        TokenTagging pos = null;
+        if (posToolName != null)
+          pos = findByTool(tkz.getTokenTaggingList(), posToolName);
+        TokenTagging ner = null;
+        if (nerToolName != null)
+          findByTool(tkz.getTokenTaggingList(), nerToolName);
 
         int n = tkz.getTokenList().getTokenListSize();
         for (int i = 0; i < n; i++) {
           setToken(token, c, tkz, pos, ner, tokenOffset, i, alph);
+          if (debug) {
+            Log.info("just set token[" + token.index + "]=" + token.getWordStr());
+          }
           token.forwards();
         }
 
@@ -224,6 +250,10 @@ public class ConcreteIO {
         addConstituents(p, tokenOffset, constituent, constituentIndices, alph);
       }
     }
+
+    // For debugging
+    DocumentTester test = new DocumentTester(doc, true);
+    assert test.firstAndLastTokensValid();
 
     // Add Propbank SRL
     if (this.propbankSrlToolName != null) {
@@ -344,11 +374,14 @@ public class ConcreteIO {
 
   public static ConcreteIO makeInstance() {
     File bcParent = new File("/home/travis/code/fnparse/data/embeddings");
+    Log.info("loading BrownClusters (256)");
     BrownClusters bc256 = new BrownClusters(BrownClusters.bc256dir(bcParent));
+    Log.info("loading BrownClusters (1000)");
     BrownClusters bc1000 = new BrownClusters(BrownClusters.bc1000dir(bcParent));
-    File wnDictDir = new File("data/wordnet/dict/");
+    File wnDictDir = new File("/home/travis/code/coref/data/wordnet/dict/");
     IRAMDictionary wnDict = new RAMDictionary(wnDictDir, ILoadPolicy.IMMEDIATE_LOAD);
     try {
+      Log.info("loading WordNet");
       wnDict.open();
     } catch(Exception e) {
       throw new RuntimeException(e);
@@ -359,19 +392,29 @@ public class ConcreteIO {
 
   public static <T> T findByTool(List<T> items, String toolname) {
     T match = null;
+    List<String> possible = new ArrayList<>();
     for (T t : items) {
       try {
         Method m = t.getClass().getMethod("getMetadata");
         AnnotationMetadata am = (AnnotationMetadata) m.invoke(t);
+        possible.add(am.getTool());
         if (toolname.equals(am.getTool())) {
-          assert match == null;
+          if (match != null) {
+            throw new RuntimeException("non-unique toolname \""
+                + toolname + "\" in " + possible
+                + " [" + items.get(0).getClass() + "]");
+          }
           match = t;
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }
-    assert match != null;
+    if (match == null) {
+      throw new RuntimeException("couldn't find tool named \""
+          + toolname + "\" in " + possible
+          + " [" + items.get(0).getClass() + "]");
+    }
     return match;
   }
 

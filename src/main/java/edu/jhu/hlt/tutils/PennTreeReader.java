@@ -93,7 +93,7 @@ public class PennTreeReader {
 
     /**
      * Returns the index (in the list of leaf nodes *including traces*) of the
-     * first node that this node dominates.
+     * first node that this node dominates (inclusive).
      */
     public int getFirstToken(PennTreeReader.Node node) {
       assert first[node.id] < byId.length;
@@ -102,7 +102,7 @@ public class PennTreeReader {
 
     /**
      * Returns the index (in the list of leaf nodes *including traces*) of the
-     * last node that this node dominates.
+     * last node that this node dominates (inclusive).
      */
     public int getLastToken(PennTreeReader.Node node) {
       assert last[node.id] >= 0;
