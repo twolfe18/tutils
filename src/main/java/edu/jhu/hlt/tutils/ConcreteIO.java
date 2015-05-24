@@ -21,6 +21,7 @@ import edu.jhu.hlt.concrete.TokenTagging;
 import edu.jhu.hlt.concrete.Tokenization;
 import edu.jhu.hlt.concrete.UUID;
 import edu.jhu.hlt.tutils.Document.ConstituentItr;
+import edu.jhu.hlt.tutils.Document.ConstituentType;
 import edu.mit.jwi.IRAMDictionary;
 import edu.mit.jwi.RAMDictionary;
 import edu.mit.jwi.data.ILoadPolicy;
@@ -51,6 +52,8 @@ public class ConcreteIO {
   /** Only supports a single {@link Parse} for now */
   private String consParseToolName =
       edu.jhu.hlt.concrete.ingest.Conll2011.META_PARSE.getTool();
+  // TODO allow this to be set set separately
+  private ConstituentType consParseToolType = ConstituentType.PTB_GOLD;
 
   /**
    * Assumes Propbank SRL is stored as a {@link SituationMention} using
@@ -145,8 +148,10 @@ public class ConcreteIO {
     for (edu.jhu.hlt.concrete.Constituent ccon : p.getConstituentList()) {
       if (debug_cons)
         Log.info("ccon=" + ccon);
-      cons.setLhs(alph.cfg(ccon.getTag()));
       assert ccon.isSetStart() == ccon.isSetEnding();
+
+      cons.setLhs(alph.cfg(ccon.getTag()));
+      cons.setParent(Document.NONE);  // Will be over-written later
       if (ccon.isSetStart()) {
         if (debug_cons)
           Log.info("setting lastToken[" + cons.getIndex() + "]=" + (tokenOffset + ccon.getEnding() - 1));
@@ -154,6 +159,19 @@ public class ConcreteIO {
         cons.setLastToken(tokenOffset + ccon.getEnding() - 1);
       }
       ccon2dcon[ccon.getId()] = cons.getIndex();
+
+      // Set parent pointer (for leaf tokens)
+      if (ccon.getChildListSize() == 0) {
+        if (cons.getFirstToken() < 0 || cons.getLastToken() < 0)
+          throw new RuntimeException();
+        Document doc = cons.getDocument();
+        int[] cons_parent = doc.getConsParent(consParseToolType);
+        for (int i = cons.getFirstToken(); i <= cons.getLastToken(); i++) {
+          if (cons_parent[i] != Document.UNINITIALIZED)
+            throw new RuntimeException();
+          cons_parent[i] = cons.index;
+        }
+      }
 
       // Store this Constituents index
       int i = cons.forwards();
@@ -167,7 +185,7 @@ public class ConcreteIO {
     for (edu.jhu.hlt.concrete.Constituent ccon : p.getConstituentList()) {
       int parentIdx = ccon2dcon[ccon.getId()];
       Document.Constituent parent = d.getConstituent(parentIdx);
-      int prevChildIdx = -1;
+      int prevChildIdx = Document.NONE;
       for (int child : ccon.getChildList()) {
         int childIdx = ccon2dcon[p.getConstituentList().get(child).getId()];
         Document.Constituent c = d.getConstituent(childIdx);
@@ -181,7 +199,7 @@ public class ConcreteIO {
         prevChildIdx = childIdx;
       }
       if (prevChildIdx >= 0)
-        d.getConstituent(prevChildIdx).setRightSib(-1);
+        d.getConstituent(prevChildIdx).setRightSib(Document.NONE);
     }
   }
 
@@ -189,7 +207,7 @@ public class ConcreteIO {
       Communication c, int docIndex, MultiAlphabet alph) {
 
     // Count the number of tokens and constituents
-    int numToks = 0;  //, numCons = 0;
+    int numToks = 0;
     Map<UUID, Integer> tokenizationUUID_to_tokenOffset = new HashMap<>();
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
@@ -198,25 +216,13 @@ public class ConcreteIO {
         Integer i = tokenizationUUID_to_tokenOffset.put(tkz.getUuid(), numToks);
         if (i != null) throw new RuntimeException();
 
-//        Parse p = findByTool(tkz.getParseList(), consParseToolName);
         numToks += tkz.getTokenList().getTokenListSize();
-//        numCons += p.getConstituentListSize();
       }
     }
-    // Reserve space for Propbank SRL constituents
-//    if (this.propbankSrlToolName != null) {
-//      SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), propbankSrlToolName);
-//      for (SituationMention sm : sms.getMentionList())
-//        numCons += sm.getArgumentListSize() + 1;
-//    }
-    /*
-     * Figuring out how many constituents are needed for this ahead of time is
-     * not practical. Especially since the fact that split predicates (but
-     * continuous) may be added as only a TokenRefSequence without a ConstituentRef.
-     */
 
     // Build the Document
     Document doc = new Document(c.getId(), docIndex, alph);
+    DocumentTester test = new DocumentTester(doc, true);
     doc.reserveTokens(numToks);
     //doc.reserveConstituents(numCons);
     doc.reserveConstituents(numToks); // a conservative guess
@@ -250,15 +256,16 @@ public class ConcreteIO {
         }
 
         Parse p = findByTool(tkz.getParseList(), consParseToolName);
+        int start = constituent.index;
         addConstituents(p, tokenOffset, constituent, constituentIndices, alph);
+        int end = constituent.index - 1;
+        assert test.checkConstituencyTree(start, end);
       }
     }
 
     // Compute some derived values in Document
     doc.computeDepths();
 
-    // For debugging
-//    DocumentTester test = new DocumentTester(doc, true);
 //    assert test.firstAndLastTokensValid();
 
     // Add Propbank SRL
@@ -274,13 +281,13 @@ public class ConcreteIO {
               constituentIndices, tokenizationUUID_to_tokenOffset, doc);
           int pred = alph.srl(sm.getSituationKind());
           constituent.setLhs(pred);
-          constituent.setLeftSib(-1);
-          constituent.setRightSib(-1);
-          constituent.setParent(-1);
+          constituent.setLeftSib(Document.NONE);
+          constituent.setRightSib(Document.NONE);
+          constituent.setParent(Document.NONE);
           int predConsIndex = constituent.forwards();
 
           // Set the arguments
-          int prevArgConsIdx = -1;
+          int prevArgConsIdx = Document.NONE;
           int numArgs = sm.getArgumentListSize();
           for (int ai = 0; ai < numArgs; ai++) {
             MentionArgument arg = sm.getArgumentList().get(ai);
@@ -313,7 +320,7 @@ public class ConcreteIO {
               constituent.setRightSib(cur);
               constituent.gotoConstituent(cur);
             } else if (ai == numArgs - 1) {
-              constituent.setRightSib(-1);
+              constituent.setRightSib(Document.NONE);
             }
 
             prevArgConsIdx = constituent.forwards();

@@ -1,11 +1,15 @@
 package edu.jhu.hlt.tutils;
 
+import org.junit.Assert;
+import org.junit.Test;
+
 import edu.jhu.hlt.concrete.Communication;
 import edu.jhu.hlt.concrete.ingest.Ontonotes4;
 
 public class PropbankIngestionTest {
 
-  public static void main(String[] args) throws Exception {
+  @Test
+  public void test0() throws Exception {
     MultiAlphabet alph = new MultiAlphabet();
     int docIndex = 0;
 //    File in = new File("/tmp/on4.concrete.tgz");
@@ -21,7 +25,7 @@ public class PropbankIngestionTest {
     ConcreteIO cio = new ConcreteIO(null, null, null);
     cio.setConstituencyParseToolname("ontonotes4");
     cio.setPropbankToolname("ontonotes4");
-    cio.setPosToolName(null);
+    cio.setPosToolName("ontonotes4-pos");
     cio.setNerToolName(null);
 
     System.out.println("reading");
@@ -36,5 +40,8 @@ public class PropbankIngestionTest {
     System.out.println("converting");
     Document d = cio.communication2Document(c, docIndex++, alph);
     System.out.println(d);
+
+    DocumentTester test = new DocumentTester(d, true);
+    Assert.assertTrue(test.firstAndLastTokensValid());
   }
 }

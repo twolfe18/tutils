@@ -353,7 +353,7 @@ public final class Document implements Serializable {
      * you will get the 7th token.
      */
     public Token getToken(int i) {
-      return getToken(getStart() + i);
+      return new Token(getStart() + i);
     }
     @Override
     public String show(MultiAlphabet alph) {
@@ -632,24 +632,30 @@ public final class Document implements Serializable {
       return alph.cfg(cfg);
     }
 
-    public int getLhs() { return lhs[index]; }
+    public int getParent() { return parent[index]; }
     public int getLeftChild() { return leftChild[index]; }
     public int getRightSib() { return rightSib[index]; }
     public int getRightChild() { return rightChild[index]; }
     public int getLeftSib() { return leftSib[index]; }
+
+    public Constituent getParentC() { return new Constituent(parent[index]); }
+    public Constituent getLeftChildC() { return new Constituent(leftChild[index]); }
+    public Constituent getRightSibC() { return new Constituent(rightSib[index]); }
+    public Constituent getRightChildC() { return new Constituent(rightChild[index]); }
+    public Constituent getLeftSibC() { return new Constituent(leftSib[index]); }
+
+    public int getLhs() { return lhs[index]; }
     public int getDepth() { return depth[index]; }
     public int getFirstToken() { return firstToken[index]; }
     public int getLastToken() { return lastToken[index]; }
 
-    public int getParentIndex() { return parent[index]; }
-    public Constituent getParent() { return new Constituent(parent[index]); }
-
-    public void setLhs(int x) { lhs[index] = x; }
     public void setParent(int x) { parent[index] = x; }
     public void setLeftChild(int x) { leftChild[index] = x; }
     public void setRightSib(int x) { rightSib[index] = x; }
     public void setRightChild(int x) { rightChild[index] = x; }
     public void setLeftSib(int x) { leftSib[index] = x; }
+
+    public void setLhs(int x) { lhs[index] = x; }
     public void setDepth(int x) { depth[index] = x; }
     public void setFirstToken(int x) { firstToken[index] = x; }
     public void setLastToken(int x) { lastToken[index] = x; }
@@ -706,7 +712,7 @@ public final class Document implements Serializable {
 
     /** Returns the constituent index before the update is applied */
     public int gotoParent() {
-      return gotoConstituent(getParentIndex());
+      return gotoConstituent(getParent());
     }
 
     /** Returns the constituent index before the update is applied */

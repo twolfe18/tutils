@@ -54,4 +54,31 @@ public class DocumentTester {
 
     return good;
   }
+
+  public boolean checkConstituencyTree(int start, int end) {
+
+    boolean good = true;
+
+    // Only one constituent has one NONE parent
+    int numNoneParents = 0;
+    for (int i = start; i <= end; i++) {
+      int p = doc.parent[i];
+      if (p < 0 && p != Document.NONE) {
+        if (printErrorMessages)
+          System.err.println("p=" + p);
+        good = false;
+      }
+      if (p == Document.NONE)
+        numNoneParents++;
+    }
+    if (numNoneParents != 1) {
+      if (printErrorMessages)
+        System.err.println("numNoneParents=" + numNoneParents);
+      good = false;
+    }
+
+    // TODO other conditions...
+
+    return good;
+  }
 }
