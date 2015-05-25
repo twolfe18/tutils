@@ -21,6 +21,8 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import edu.jhu.hlt.tutils.Log;
+
 /**
  * Code to parse the Propbank frame index XML files.
  *
@@ -49,23 +51,22 @@ public class PropbankFrameIndex implements Serializable {
     return r;
   }
 
-  public static class Frame implements Serializable {
+  public static class PropbankFrame implements Serializable {
     private static final long serialVersionUID = -5093553346009596687L;
-    private String id;        // e.g. "steal.01"
-    private String vncls;     // e.g. "10.6"
-    private String name;      // e.g. "steal, remove illegally"
-    private List<Role> roles; // no guarantees on order
+    public final String id;        // e.g. "steal.01"
+    public final String vncls;     // e.g. "10.6"
+    public final String name;      // e.g. "steal, remove illegally"
+    private List<PropbankRole> roles; // no guarantees on order
 
     /**
      * @param rolesetNode is a "roleset" node in the Propbank XML schema
      * @param pos is the part of speech determined from the file name, e.g. "v"
      */
-    public Frame(Node rolesetNode, String pos) {
+    public PropbankFrame(Node rolesetNode, String pos) {
       NamedNodeMap attr = rolesetNode.getAttributes();
-      //System.out.println("  attr=" + attr.getNamedItem("id").getNodeValue());
 
-      this.id = get(attr, "id");  // e.g. "drop.01"
-      String[] idtoks = this.id.split("\\.");
+      String id = get(attr, "id");  // e.g. "drop.01"
+      String[] idtoks = id.split("\\.");
       if (idtoks.length != 2) throw new RuntimeException();
       this.id = idtoks[0] + "-" + pos + "-" + Integer.parseInt(idtoks[1]);
       // e.g. "drop-v-1"
@@ -76,11 +77,18 @@ public class PropbankFrameIndex implements Serializable {
       NodeList children = getChild(rolesetNode, "roles").getChildNodes();
       for (int i = 0; i < children.getLength(); i++) {
         Node n = children.item(i);
-        //System.out.println("  frame.n=" + n.getNodeName());
         if (!n.getNodeName().equals("role"))
           continue;
-        roles.add(new Role(n));
+        roles.add(new PropbankRole(n));
       }
+    }
+
+    public int numRoles() {
+      return roles.size();
+    }
+
+    public PropbankRole getRole(int i) {
+      return roles.get(i);
     }
 
     @Override
@@ -89,17 +97,17 @@ public class PropbankFrameIndex implements Serializable {
     }
   }
 
-  public static class Role implements Serializable {
+  public static class PropbankRole implements Serializable {
     private static final long serialVersionUID = 3914325013279654223L;
-    private String name;            // e.g. "0"
-    private String description;     // e.g. "agent, driver, yachter"
-    private List<String> vncls;     // values e.g. "51.4.1"
-    private List<String> vntheta;   // values e.g. "agent"
+    public final String name;           // e.g. "ARG0"
+    public final String description;    // e.g. "agent, driver, yachter"
+    private List<String> vncls;         // values e.g. "51.4.1"
+    private List<String> vntheta;       // values e.g. "agent"
 
-    public Role(Node roleNode) {
+    public PropbankRole(Node roleNode) {
       //System.out.println("   roleNode=" + roleNode);
       NamedNodeMap attr = roleNode.getAttributes();
-      this.name = get(attr, "n");
+      this.name = "ARG" + get(attr, "n");
       this.description = get(attr, "descr");
       this.vncls = new ArrayList<>();
       this.vntheta = new ArrayList<>();
@@ -118,6 +126,19 @@ public class PropbankFrameIndex implements Serializable {
       }
     }
 
+    public int numVerbNetMappings() {
+      assert vncls.size() == vntheta.size();
+      return vncls.size();
+    }
+
+    public String getVncls(int i) {
+      return vncls.get(i);
+    }
+
+    public String getVntheta(int i) {
+      return vntheta.get(i);
+    }
+
     @Override
     public String toString() {
       return "<ARG" + name + " " + description + " vn=" + vncls + "/" + vntheta + ">";
@@ -126,53 +147,55 @@ public class PropbankFrameIndex implements Serializable {
 
   // e.g. /home/travis/code/fnparse/data/ontonotes-release-4.0/data/files/data/english/metadata/frames
   private File dir;
-  private Map<String, Frame> byName;
+  private Map<String, PropbankFrame> byName;
 
   public PropbankFrameIndex(File dir) {
+    if (!dir.isDirectory())
+      throw new IllegalArgumentException("not a directory: " + dir.getPath());
     this.dir = dir;
     this.byName = new HashMap<>();
+    try {
+      parse();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public List<PropbankFrame> getAllFrames() {
+    List<PropbankFrame> l = new ArrayList<>();
+    l.addAll(byName.values());
+    return l;
   }
 
   private void parse() throws Exception {
+    Log.info("reading frames from " + dir.getPath());
     DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
     DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-
     for (File frameFile : dir.listFiles()) {
       if (!frameFile.getName().endsWith(".xml") || frameFile.getName().startsWith("."))
         continue;
-//      System.out.println(frameFile.getName());
-
-//      String[] toks = frameFile.getName().split("-");
-//      System.out.println("toks=" + Arrays.toString(toks));
-//      if (toks.length != 2) throw new RuntimeException();
-//      String pos = toks[1].split("\\.")[0];
 
       String fn = frameFile.getName();
       int s = fn.lastIndexOf('-');
       int e = fn.lastIndexOf('.');
       String pos = fn.substring(s + 1, e);
-//      System.out.println("pos=" + pos);
-
 
       Document doc = dBuilder.parse(frameFile);
       Element frameset = doc.getDocumentElement();
-      //System.out.println(frameset.getChildNodes());
       NodeList pnl = frameset.getElementsByTagName("predicate");
       for (int i = 0; i < pnl.getLength(); i++) {
-        //Frame f = new Frame(pnl.item(i));
-        //System.out.println(f);
         NodeList rolesetsAndJunk = pnl.item(i).getChildNodes();
         for (int j = 0; j < rolesetsAndJunk.getLength(); j++) {
           Node n = rolesetsAndJunk.item(j);
           if (!n.getNodeName().equals("roleset"))
             continue;
-          Frame f = new Frame(n, pos);
-          //System.out.println(f);
-          Frame old = byName.put(f.id, f);
+          PropbankFrame f = new PropbankFrame(n, pos);
+          PropbankFrame old = byName.put(f.id, f);
           if (old != null) throw new RuntimeException("key=" + f.id);
         }
       }
     }
+    Log.info("read " + byName.size() + " frames");
   }
 
   public static void main(String[] args) throws Exception {
