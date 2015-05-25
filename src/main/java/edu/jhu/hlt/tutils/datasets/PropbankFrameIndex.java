@@ -7,6 +7,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -31,11 +32,47 @@ import edu.jhu.hlt.tutils.Log;
 public class PropbankFrameIndex implements Serializable {
   private static final long serialVersionUID = 3986362260702735369L;
 
+  // Taken from
+  // file:///home/travis/code/fnparse/data/ontonotes-release-4.0/docs/propbank/english-propbank.pdf
+  // as it appears to be a longer list than:
+  // http://verbs.colorado.edu/~mpalmer/projects/ace/PBguidelines.pdf
+  public static final List<String> MODIFIER_ROLES = Arrays.asList(
+      "ARGM-COM",
+      "ARGM-LOC",
+      "ARGM-DIR",
+      "ARGM-GOL",
+      "ARGM-MNR",
+      "ARGM-TMP",
+      "ARGM-EXT",
+      "ARGM-REC",
+      "ARGM-PRD",
+      "ARGM-PRP",
+      "ARGM-CAU",
+      "ARGM-DIS",
+      "ARGM-MOD",
+      "ARGM-NEG",
+      "ARGM-DSP",
+      "ARGM-LVB",
+      "ARGM-ADV",
+      "ARGM-ADJ",
+      "LINK-SLC",
+      "LINK-PCR");
+
   public static String get(NamedNodeMap attr, String key) {
+    return get(attr, key, true);
+  }
+
+  public static String get(NamedNodeMap attr, String key, boolean allowFailure) {
     Node n = attr.getNamedItem(key);
-    if (n == null)
+    if (n == null) {
+      if (!allowFailure)
+        throw new RuntimeException("could not find " + key);
       return null;
-    return n.getNodeValue();
+    }
+    String r = n.getNodeValue();
+    if (!allowFailure && r == null)
+      throw new RuntimeException("could not find " + key);
+    return r;
   }
 
   public static Node getChild(Node n, String childName) {
@@ -51,6 +88,9 @@ public class PropbankFrameIndex implements Serializable {
     return r;
   }
 
+  /**
+   * Note that this class does not include ARGM roles.
+   */
   public static class PropbankFrame implements Serializable {
     private static final long serialVersionUID = -5093553346009596687L;
     public final String id;        // e.g. "steal.01"
@@ -65,7 +105,7 @@ public class PropbankFrameIndex implements Serializable {
     public PropbankFrame(Node rolesetNode, String pos) {
       NamedNodeMap attr = rolesetNode.getAttributes();
 
-      String id = get(attr, "id");  // e.g. "drop.01"
+      String id = get(attr, "id", false);  // e.g. "drop.01"
       String[] idtoks = id.split("\\.");
       if (idtoks.length != 2) throw new RuntimeException();
       this.id = idtoks[0] + "-" + pos + "-" + Integer.parseInt(idtoks[1]);
@@ -79,16 +119,32 @@ public class PropbankFrameIndex implements Serializable {
         Node n = children.item(i);
         if (!n.getNodeName().equals("role"))
           continue;
+
+        // For some reason, some of these have role appear to have an empty role
+        // name... Discard these (there is no way to refer to them anyway).
+        String roleName = get(n.getAttributes(), "n", false);
+        if (roleName.isEmpty()) {
+          Log.warn(this.id + " has role with no name!");
+          continue;
+        }
+
         roles.add(new PropbankRole(n));
       }
     }
 
+    /** Does not include ARM-* roles */
     public int numRoles() {
       return roles.size();
     }
 
+    /** Does not include ARM-* roles */
     public PropbankRole getRole(int i) {
       return roles.get(i);
+    }
+
+    /** Does not include ARM-* roles */
+    public List<PropbankRole> getRoles() {
+      return roles;
     }
 
     @Override
@@ -99,15 +155,20 @@ public class PropbankFrameIndex implements Serializable {
 
   public static class PropbankRole implements Serializable {
     private static final long serialVersionUID = 3914325013279654223L;
-    public final String name;           // e.g. "ARG0"
+    public final String role;           // e.g. "ARG0" or "ARGM"
+    public final String roleFeatures;   // e.g. "EXT", only defined for ARGM
     public final String description;    // e.g. "agent, driver, yachter"
     private List<String> vncls;         // values e.g. "51.4.1"
     private List<String> vntheta;       // values e.g. "agent"
 
     public PropbankRole(Node roleNode) {
-      //System.out.println("   roleNode=" + roleNode);
       NamedNodeMap attr = roleNode.getAttributes();
-      this.name = "ARG" + get(attr, "n");
+      this.role = "ARG" + get(attr, "n", false).toUpperCase();
+      assert !role.equals("ARG");
+
+      String feats = get(attr, "f");
+      this.roleFeatures = feats == null || feats.isEmpty() ? null : feats.toUpperCase();
+
       this.description = get(attr, "descr");
       this.vncls = new ArrayList<>();
       this.vntheta = new ArrayList<>();
@@ -116,14 +177,21 @@ public class PropbankFrameIndex implements Serializable {
         Node n = children.item(i);
         if (n.getNodeName().equals("vnrole")) {
           NamedNodeMap attr2 = n.getAttributes();
-          this.vncls.add(get(attr2, "vncls"));
-          this.vntheta.add(get(attr2, "vntheta"));
+          this.vncls.add(get(attr2, "vncls", false));
+          this.vntheta.add(get(attr2, "vntheta", false));
         }
       }
       if (vncls.size() == 0) {
         vncls = Collections.emptyList();
         vntheta = Collections.emptyList();
       }
+    }
+
+    /** Returns a full string like "ARG2" or "ARGM-LOC" */
+    public String getLabel() {
+      if (roleFeatures != null && role.equals("ARGM"))
+        return role + "-" + roleFeatures;
+      return role;
     }
 
     public int numVerbNetMappings() {
@@ -141,7 +209,7 @@ public class PropbankFrameIndex implements Serializable {
 
     @Override
     public String toString() {
-      return "<ARG" + name + " " + description + " vn=" + vncls + "/" + vntheta + ">";
+      return "<" + getLabel() + " \"" + description + "\" vn=" + vncls + "/" + vntheta + ">";
     }
   }
 
@@ -179,6 +247,7 @@ public class PropbankFrameIndex implements Serializable {
       int s = fn.lastIndexOf('-');
       int e = fn.lastIndexOf('.');
       String pos = fn.substring(s + 1, e);
+      assert Arrays.asList("n", "v").contains(pos);
 
       Document doc = dBuilder.parse(frameFile);
       Element frameset = doc.getDocumentElement();
@@ -190,8 +259,10 @@ public class PropbankFrameIndex implements Serializable {
           if (!n.getNodeName().equals("roleset"))
             continue;
           PropbankFrame f = new PropbankFrame(n, pos);
+          //System.out.println("adding " + f);
           PropbankFrame old = byName.put(f.id, f);
-          if (old != null) throw new RuntimeException("key=" + f.id);
+          if (old != null)
+            throw new RuntimeException("key=" + f.id + " f1=" + old + " f2=" + f);
         }
       }
     }
@@ -202,7 +273,6 @@ public class PropbankFrameIndex implements Serializable {
     File dir = new File("/home/travis/code/fnparse/data/ontonotes-release-4.0/data/files/data/english/metadata/frames");
     PropbankFrameIndex fi = new PropbankFrameIndex(dir);
     long start = System.currentTimeMillis();
-    fi.parse();
     System.out.println(System.currentTimeMillis() - start);
 
     // See how long it takes to (de)serialize with Java serialization
@@ -213,7 +283,7 @@ public class PropbankFrameIndex implements Serializable {
     oos.close();
     start = System.currentTimeMillis();
     ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f));
-    Object foo = ois.readObject();
+    ois.readObject();
     ois.close();
     System.out.println(System.currentTimeMillis() - start);
   }
