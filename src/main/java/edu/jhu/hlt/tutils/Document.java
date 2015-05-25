@@ -144,6 +144,24 @@ public final class Document implements Serializable {
     }
   }
 
+
+  // AHHHH!!!
+  // breaks is not necessary and clumsy!
+  // Use constituents instead!
+  // space used by breaks = sizeof(int) * #tokens
+  // space used by constituents = sizeof(int) * 9 * #sentences
+  //      (with reconstruction) = sizeof(int) * 5 * #sentences
+  // TODO once this is setup, then I can get rid of the parent stuff
+  public int cons_sentences = NONE;  // index of constituent corresponding to the first sentence
+  public int cons_paragraph = NONE;
+  public int cons_section = NONE;
+  public int cons_ptb_gold = NONE;
+  public int cons_ptb_auto = NONE;
+  public int cons_propbank_gold = NONE;
+  public int cons_propbank_auto = NONE;
+  public int cons_ner_gold = NONE;
+  public int cons_ner_auto = NONE;
+
   // First tokens of paragraphs and sentences
   int[] breaks;
 
@@ -151,18 +169,20 @@ public final class Document implements Serializable {
   // NEW: type is implicit from whether you got this constituent from
   // cons_parent_ptb_auto vs cons_parent_propbank_gold, etc.
 //  int[] cons_type;    // Used to say things like what parser generated this.
+  // TODO maybe rename this to "tag"
   int[] lhs;          // left hand side of a CFG rule, e.g. "NP" or "SBAR", NOT a POS tag (that would mean 1 Constituent per word, we want to stay one level higher than that)
 
   int[] leftChild;    // < 0 for leaf nodes
   int[] rightSib;
+
+  int[] firstToken;   // Document token index, inclusive
+  int[] lastToken;    // Document token index, inclusive
 
   // Things below this line need not be saved (can be re-derived)
   int[] parent;       // Constituent index, -1 for roots
   int[] rightChild;   // < 0 for leaf nodes
   int[] leftSib;
   int[] depth;
-  int[] firstToken;   // Document token index, inclusive
-  int[] lastToken;    // Document token index, inclusive
 
 
   // TODO The working plan for {@link Situation}s and {@link Entity}s is to put
@@ -625,12 +645,14 @@ public final class Document implements Serializable {
       return leftChild[index] < 0;
     }
 
-    public String getLhsStr() {
-      int cfg = lhs[index];
-      if (cfg < 0)
-        return "???";
-      return alph.cfg(cfg);
-    }
+    // NOTE: If `lhs` may be used for more than one thing: then don't allow
+    // this type of method!
+//    public String getLhsStr() {
+//      int cfg = lhs[index];
+//      if (cfg < 0)
+//        return "???";
+//      return alph.cfg(cfg);
+//    }
 
     public int getParent() { return parent[index]; }
     public int getLeftChild() { return leftChild[index]; }
@@ -701,11 +723,21 @@ public final class Document implements Serializable {
       return old;
     }
 
+    /** Returns the constituent before the update is applied */
+    public Constituent forwardsC() {
+      return Document.this.getConstituent(forwards());
+    }
+
     /** Returns the constituent index before the update is applied */
     public int backwards() {
       int old = index;
       index--;
       return old;
+    }
+
+    /** Returns the constituent before the update is applied */
+    public Constituent backwardsC() {
+      return Document.this.getConstituent(backwards());
     }
 
     public boolean isValid() { return index >= 0; }

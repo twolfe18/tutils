@@ -20,6 +20,7 @@ import edu.jhu.hlt.concrete.TokenRefSequence;
 import edu.jhu.hlt.concrete.TokenTagging;
 import edu.jhu.hlt.concrete.Tokenization;
 import edu.jhu.hlt.concrete.UUID;
+import edu.jhu.hlt.tutils.Document.Constituent;
 import edu.jhu.hlt.tutils.Document.ConstituentItr;
 import edu.jhu.hlt.tutils.Document.ConstituentType;
 import edu.mit.jwi.IRAMDictionary;
@@ -169,7 +170,7 @@ public class ConcreteIO {
         for (int i = cons.getFirstToken(); i <= cons.getLastToken(); i++) {
           if (cons_parent[i] != Document.UNINITIALIZED)
             throw new RuntimeException();
-          cons_parent[i] = cons.index;
+          cons_parent[i] = cons.getIndex();
         }
       }
 
@@ -206,9 +207,17 @@ public class ConcreteIO {
   public Document communication2Document(
       Communication c, int docIndex, MultiAlphabet alph) {
 
-    // Count the number of tokens and constituents
+    Document doc = new Document(c.getId(), docIndex, alph);
+    Document.ConstituentItr constituent = doc.getConstituentItr(0);
+    constituent.allowExpansion(true);
+    doc.reserveConstituents(64);
+
+    // Count the number of tokens and add the sentence sectioning
+    doc.cons_sentences = constituent.getIndex();
     int numToks = 0;
+    int prevSent = Document.NONE;
     Map<UUID, Integer> tokenizationUUID_to_tokenOffset = new HashMap<>();
+    // TODO add section segmentation
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
 
@@ -216,19 +225,25 @@ public class ConcreteIO {
         Integer i = tokenizationUUID_to_tokenOffset.put(tkz.getUuid(), numToks);
         if (i != null) throw new RuntimeException();
 
+        int start = numToks;
         numToks += tkz.getTokenList().getTokenListSize();
+
+        constituent.setFirstToken(start);
+        constituent.setLastToken(numToks - 1);
+        constituent.setOnlyChild(Document.NONE);
+        constituent.setParent(Document.NONE);
+        constituent.setRightSib(Document.NONE);
+        constituent.setLeftSib(prevSent);
+        if (prevSent != Document.NONE)
+          doc.getConstituent(prevSent).setRightSib(constituent.getIndex());
+        prevSent = constituent.forwards();
       }
     }
 
     // Build the Document
-    Document doc = new Document(c.getId(), docIndex, alph);
     DocumentTester test = new DocumentTester(doc, true);
     doc.reserveTokens(numToks);
-    //doc.reserveConstituents(numCons);
-    doc.reserveConstituents(numToks); // a conservative guess
     Document.TokenItr token = doc.getTokenItr(0);
-    Document.ConstituentItr constituent = doc.getConstituentItr(0);
-    constituent.allowExpansion(true);
     Map<ConstituentRef, Integer> constituentIndices = new HashMap<>();
     for (Section s : c.getSectionList()) {
       token.setBreakSafe(Document.Paragraph.BREAK_LEVEL);
@@ -256,9 +271,10 @@ public class ConcreteIO {
         }
 
         Parse p = findByTool(tkz.getParseList(), consParseToolName);
-        int start = constituent.index;
+        int start = constituent.getIndex();
         addConstituents(p, tokenOffset, constituent, constituentIndices, alph);
-        int end = constituent.index - 1;
+        int end = constituent.getIndex() - 1;
+        assert end > start;
         assert test.checkConstituencyTree(start, end);
       }
     }
@@ -274,57 +290,84 @@ public class ConcreteIO {
       if (sms == null) {
         System.err.println("failed to find Propbank SRL: " + propbankSrlToolName);
       } else {
+        doc.cons_propbank_gold = constituent.getIndex();
+        int prevSit = Document.NONE;
         for (SituationMention sm : sms.getMentionList()) {
 
+          // Make a situation node which is the parent of all the pred/args
+          Constituent sit = constituent.forwardsC();
+          sit.setLhs(alph.srl("propbank"));
+          sit.setLeftSib(prevSit);
+          sit.setRightSib(Document.NONE); // will be over-written
+          sit.setParent(Document.NONE);
+          if (prevSit != Document.NONE)
+            doc.getConstituent(prevSit).setRightSib(sit.getIndex());
+          prevSit = sit.getIndex();
+
+          // Constituent index of previous pred/arg
+          int prev = Document.NONE;
+
           // Set the predicate
+          // first/last tokens + left/right children
           setupConstituent(sm.getConstituent(), sm.getTokens(), constituent,
               constituentIndices, tokenizationUUID_to_tokenOffset, doc);
-          int pred = alph.srl(sm.getSituationKind());
-          constituent.setLhs(pred);
+          // Everything else
+          constituent.setLhs(alph.srl(sm.getSituationKind()));
+          constituent.setParent(sit.getIndex());
           constituent.setLeftSib(Document.NONE);
           constituent.setRightSib(Document.NONE);
-          constituent.setParent(Document.NONE);
-          int predConsIndex = constituent.forwards();
+
+          // Set sit -> pred
+          sit.setLeftChild(constituent.getIndex());
+          sit.setRightChild(constituent.getIndex());
+          Log.info("adding Situation text=\"" + sm.getText() + "\" first=" + constituent.getFirstToken() + " last=" + constituent.getLastToken());
+
+          // Set the parent links (verb token -> propbank cons node)
+          assert constituent.getFirstToken() >= 0;
+          assert constituent.getLastToken() >= 0;
+          int[] parents = doc.getConsParent(ConstituentType.PROPBANK_GOLD);
+          for (int tokI = constituent.getFirstToken(); tokI <= constituent.getLastToken(); tokI++) {
+            parents[tokI] = constituent.getIndex();
+          }
+
+          // Store the bounds of the entire situation
+          int firstT = constituent.getFirstToken();
+          int lastT = constituent.getLastToken();
+
+          prev = constituent.forwards();
 
           // Set the arguments
-          int prevArgConsIdx = Document.NONE;
           int numArgs = sm.getArgumentListSize();
           for (int ai = 0; ai < numArgs; ai++) {
             MentionArgument arg = sm.getArgumentList().get(ai);
-
-            // Set first/last token and left/right child
-            // Make sure this comes before other operations.
+            // first/last tokens + left/right children
             setupConstituent(arg.getConstituent(), arg.getTokens(), constituent,
                 constituentIndices, tokenizationUUID_to_tokenOffset, doc);
-            int role = alph.srl(arg.getRole());
-            constituent.setLhs(role);
+            // Everything else
+            constituent.setLhs(alph.srl(arg.getRole()));
+            constituent.setParent(sit.getIndex());
+            constituent.setLeftSib(prev);
+            constituent.setRightSib(Document.NONE);
 
-            // Set parent
-            constituent.setParent(predConsIndex);
+            doc.getConstituent(prev).setRightSib(constituent.getIndex());
 
-            // Set left/right child (of the predicate)
-            if (ai == 0) {
-              int cur = constituent.gotoConstituent(predConsIndex);
-              constituent.setLeftChild(cur);
-              constituent.gotoConstituent(cur);
-            } else if (ai == numArgs - 1) {
-              int cur = constituent.gotoConstituent(predConsIndex);
-              constituent.setRightChild(cur);
-              constituent.gotoConstituent(cur);
-            }
+            // Update bounds of entire situation
+            assert constituent.getFirstToken() >= 0;
+            if (constituent.getFirstToken() < firstT)
+              firstT = constituent.getFirstToken();
+            assert constituent.getLastToken() >= 0;
+            if (constituent.getLastToken() < lastT)
+              lastT = constituent.getLastToken();
 
-            // Set left/right sibling
-            constituent.setLeftSib(prevArgConsIdx);
-            if (ai > 0) {
-              int cur = constituent.gotoConstituent(prevArgConsIdx);
-              constituent.setRightSib(cur);
-              constituent.gotoConstituent(cur);
-            } else if (ai == numArgs - 1) {
-              constituent.setRightSib(Document.NONE);
-            }
+            // Update right child of situation
+            sit.setRightChild(constituent.getIndex());
 
-            prevArgConsIdx = constituent.forwards();
+            prev = constituent.forwards();
           }
+
+          // Set the first and last token for the entire situation
+          sit.setFirstToken(firstT);
+          sit.setLastToken(lastT);
         }
       }
     }
@@ -353,9 +396,11 @@ public class ConcreteIO {
       Map<UUID, Integer> tokenizationUUID_to_tokenOffset,
       Document doc) {
     if (cr != null) {
+      Log.info("setting constituent");
       int i = constituentIndices.get(cr);
       constituent.setOnlyChild(i);
     } else {
+      Log.info("making constituent from TokenRefSequence");
       if (trs == null)
         throw new IllegalArgumentException();
       int tokenOffset = tokenizationUUID_to_tokenOffset.get(trs.getTokenizationId());
