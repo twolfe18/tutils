@@ -320,7 +320,11 @@ public class ConcreteIO {
           // Set sit -> pred
           sit.setLeftChild(constituent.getIndex());
           sit.setRightChild(constituent.getIndex());
-          Log.info("adding Situation text=\"" + sm.getText() + "\" first=" + constituent.getFirstToken() + " last=" + constituent.getLastToken());
+          if (debug) {
+            Log.info("adding Situation text=\"" + sm.getText()
+                + "\" first=" + constituent.getFirstToken()
+                + " last=" + constituent.getLastToken());
+          }
 
           // Set the parent links (verb token -> propbank cons node)
           assert constituent.getFirstToken() >= 0;
@@ -388,7 +392,7 @@ public class ConcreteIO {
    * {@link ConstituentItr}, meaning that anything that fields that were set
    * before calling this method will be lost.
    */
-  private static void setupConstituent(
+  private void setupConstituent(
       ConstituentRef cr,
       TokenRefSequence trs,
       ConstituentItr constituent,
@@ -396,11 +400,13 @@ public class ConcreteIO {
       Map<UUID, Integer> tokenizationUUID_to_tokenOffset,
       Document doc) {
     if (cr != null) {
-      Log.info("setting constituent");
+      if (debug)
+        Log.info("setting constituent");
       int i = constituentIndices.get(cr);
       constituent.setOnlyChild(i);
     } else {
-      Log.info("making constituent from TokenRefSequence");
+      if (debug)
+        Log.info("making constituent from TokenRefSequence");
       if (trs == null)
         throw new IllegalArgumentException();
       int tokenOffset = tokenizationUUID_to_tokenOffset.get(trs.getTokenizationId());

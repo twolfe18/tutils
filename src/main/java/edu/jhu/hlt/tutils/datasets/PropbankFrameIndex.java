@@ -126,6 +126,7 @@ public class PropbankFrameIndex implements Serializable {
         if (roleName.isEmpty()) {
           Log.warn(this.id + " has role with no name!");
           continue;
+//          throw new RuntimeException(this.id + " has a role with no name!");
         }
 
         roles.add(new PropbankRole(n));
@@ -270,7 +271,8 @@ public class PropbankFrameIndex implements Serializable {
   }
 
   public static void main(String[] args) throws Exception {
-    File dir = new File("/home/travis/code/fnparse/data/ontonotes-release-4.0/data/files/data/english/metadata/frames");
+    //File dir = new File("/home/travis/code/fnparse/data/ontonotes-release-4.0/data/files/data/english/metadata/frames");
+    File dir = new File("/home/travis/code/fnparse/data/ontonotes-release-5.0/LDC2013T19/data/files/data/english/metadata/frames");
     PropbankFrameIndex fi = new PropbankFrameIndex(dir);
     long start = System.currentTimeMillis();
     System.out.println(System.currentTimeMillis() - start);
