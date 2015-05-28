@@ -356,16 +356,18 @@ public final class Document implements Serializable {
 
   // Ways to slice up a document
   public abstract class AbstractSlice implements MultiAlphabet.Showable {
+
     public abstract int getStart();
     public abstract int getWidth();
+
     public List<Token> getTokens() {
       List<Token> tokens = new ArrayList<>();
-      int start = getStart();
       int width = getWidth();
       for (int w = 0; w < width; w++)
-        tokens.add(getToken(start + w));
+        tokens.add(getToken(w));
       return tokens;
     }
+
     /**
      * Give a RELATIVE index rather than document-wide index.
      *
@@ -375,6 +377,7 @@ public final class Document implements Serializable {
     public Token getToken(int i) {
       return new Token(getStart() + i);
     }
+
     @Override
     public String show(MultiAlphabet alph) {
       StringBuilder sb = new StringBuilder();
@@ -385,6 +388,17 @@ public final class Document implements Serializable {
       }
       return sb.toString();
     }
+
+    public String showWords(MultiAlphabet alph) {
+      StringBuilder sb = new StringBuilder();
+      for (Token t : getTokens()) {
+        if (sb.length() > 0)
+          sb.append("  ");
+        sb.append(alph.word(t.getWord()));
+      }
+      return sb.toString();
+    }
+
     public Document getDocument() {
       return Document.this;
     }
