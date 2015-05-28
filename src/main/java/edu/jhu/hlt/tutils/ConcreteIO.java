@@ -20,6 +20,7 @@ import edu.jhu.hlt.concrete.TokenRefSequence;
 import edu.jhu.hlt.concrete.TokenTagging;
 import edu.jhu.hlt.concrete.Tokenization;
 import edu.jhu.hlt.concrete.UUID;
+import edu.jhu.hlt.concrete.ingest.conll.Conll2011;
 import edu.jhu.hlt.tutils.Document.Constituent;
 import edu.jhu.hlt.tutils.Document.ConstituentItr;
 import edu.jhu.hlt.tutils.Document.ConstituentType;
@@ -43,16 +44,13 @@ public class ConcreteIO {
   public boolean debug_cons = false;
 
   /** Only supports a single POS {@link TokenTagging} for now */
-  private String posToolName =
-      edu.jhu.hlt.concrete.ingest.Conll2011.META_POS.getTool();
+  private String posToolName = Conll2011.META_POS.getTool();
 
   /** Only supports {@link TokenTagging} style NER for now */
-  private String nerToolName =
-      edu.jhu.hlt.concrete.ingest.Conll2011.META_NER.getTool();
+  private String nerToolName = Conll2011.META_NER.getTool();
 
   /** Only supports a single {@link Parse} for now */
-  private String consParseToolName =
-      edu.jhu.hlt.concrete.ingest.Conll2011.META_PARSE.getTool();
+  private String consParseToolName = Conll2011.META_PARSE.getTool();
   // TODO allow this to be set set separately
   private ConstituentType consParseToolType = ConstituentType.PTB_GOLD;
 
@@ -152,7 +150,8 @@ public class ConcreteIO {
       assert ccon.isSetStart() == ccon.isSetEnding();
 
       cons.setLhs(alph.cfg(ccon.getTag()));
-      cons.setParent(Document.NONE);  // Will be over-written later
+      cons.setParent(Document.NONE);      // Will be over-written later
+      cons.setOnlyChild(Document.NONE);   // Will be over-written later
       if (ccon.isSetStart()) {
         if (debug_cons)
           Log.info("setting lastToken[" + cons.getIndex() + "]=" + (tokenOffset + ccon.getEnding() - 1));
@@ -194,7 +193,7 @@ public class ConcreteIO {
         c.setLeftSib(prevChildIdx);
         if (prevChildIdx >= 0)
           d.getConstituent(prevChildIdx).setRightSib(childIdx);
-        if (parent.getLeftChild() < 0)
+        if (parent.getLeftChild() == Document.UNINITIALIZED)
           parent.setLeftChild(childIdx);
         parent.setRightChild(childIdx);
         prevChildIdx = childIdx;
@@ -334,6 +333,11 @@ public class ConcreteIO {
             parents[tokI] = constituent.getIndex();
           }
 
+          if (debug) {
+            Log.info("pred.firstToken=" + constituent.getFirstToken()
+                + " pred.lastToken=" + constituent.getLastToken());
+          }
+
           // Store the bounds of the entire situation
           int firstT = constituent.getFirstToken();
           int lastT = constituent.getLastToken();
@@ -360,8 +364,16 @@ public class ConcreteIO {
             if (constituent.getFirstToken() < firstT)
               firstT = constituent.getFirstToken();
             assert constituent.getLastToken() >= 0;
-            if (constituent.getLastToken() < lastT)
+            if (constituent.getLastToken() > lastT)
               lastT = constituent.getLastToken();
+
+            if (debug) {
+              Log.info("setting arg, role=" + arg.getRole()
+                  + " first=" + constituent.getFirstToken()
+                  + " last=" + constituent.getLastToken()
+                  + " leftChild=" + constituent.getLeftChild()
+                  + " rightChild=" + constituent.getRightChild());
+            }
 
             // Update right child of situation
             sit.setRightChild(constituent.getIndex());
@@ -372,6 +384,12 @@ public class ConcreteIO {
           // Set the first and last token for the entire situation
           sit.setFirstToken(firstT);
           sit.setLastToken(lastT);
+
+          if (debug) {
+            Log.info("sit.firstToken=" + sit.getFirstToken()
+                + " sit.lastToken=" + sit.getLastToken()
+                + " numArgs=" + numArgs);
+          }
         }
       }
     }
@@ -413,6 +431,7 @@ public class ConcreteIO {
       int s = tokenOffset + min(trs.getTokenIndexList());
       int e = tokenOffset + max(trs.getTokenIndexList());
       // Insert dummy constituent/span
+      constituent.setLhs(doc.getAlphabet().cfg("NOT-A-CONSTITUENT"));
       constituent.setFirstToken(s);
       constituent.setLastToken(e);
       constituent.setLeftSib(Document.NONE);
