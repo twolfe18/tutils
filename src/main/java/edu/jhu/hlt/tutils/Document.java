@@ -269,11 +269,13 @@ public final class Document implements Serializable {
 
   public boolean isRoot(int constitIndex) {
     assert parent[constitIndex] != UNINITIALIZED;
-    return parent[constitIndex] < 0;
+    return parent[constitIndex] == NONE;
   }
   public boolean isLeaf(int constitIndex) {
     assert leftChild[constitIndex] != UNINITIALIZED;
-    return leftChild[constitIndex] < 0;
+    boolean leaf = leftChild[constitIndex] == NONE;
+    if (leaf) assert firstToken[constitIndex] == lastToken[constitIndex];
+    return leaf;
   }
 
   public int getWidth(int constitIndex) {

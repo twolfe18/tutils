@@ -193,9 +193,16 @@ public class ConcreteIO {
         c.setLeftSib(prevChildIdx);
         if (prevChildIdx >= 0)
           d.getConstituent(prevChildIdx).setRightSib(childIdx);
-        if (parent.getLeftChild() == Document.UNINITIALIZED)
+        if (parent.getLeftChild() < 0) {
+          if (debug_cons) {
+            Log.info("setting " + parent.show(alph) + ".firstChild=" + c.show(alph));
+          }
           parent.setLeftChild(childIdx);
+        }
         parent.setRightChild(childIdx);
+        if (debug_cons) {
+          Log.info("setting " + parent.show(alph) + ".rightChild=" + c.show(alph));
+        }
         prevChildIdx = childIdx;
       }
       if (prevChildIdx >= 0)
@@ -244,6 +251,7 @@ public class ConcreteIO {
     doc.reserveTokens(numToks);
     Document.TokenItr token = doc.getTokenItr(0);
     Map<ConstituentRef, Integer> constituentIndices = new HashMap<>();
+    int prevParse = Document.NONE;
     for (Section s : c.getSectionList()) {
       token.setBreakSafe(Document.Paragraph.BREAK_LEVEL);
       for (Sentence ss : s.getSentenceList()) {
@@ -271,6 +279,14 @@ public class ConcreteIO {
 
         Parse p = findByTool(tkz.getParseList(), consParseToolName);
         int start = constituent.getIndex();
+
+        if (doc.cons_ptb_gold == Document.NONE)
+          doc.cons_ptb_gold = start;
+        constituent.setLeftSib(prevParse);
+        constituent.setRightSib(Document.NONE);
+        if (prevParse != Document.NONE)
+          doc.getConstituent(prevParse).setRightSib(constituent.getIndex());
+
         addConstituents(p, tokenOffset, constituent, constituentIndices, alph);
         int end = constituent.getIndex() - 1;
         assert end > start;
