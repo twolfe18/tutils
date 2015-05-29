@@ -286,6 +286,7 @@ public class ConcreteIO {
         constituent.setRightSib(Document.NONE);
         if (prevParse != Document.NONE)
           doc.getConstituent(prevParse).setRightSib(constituent.getIndex());
+        prevParse = constituent.getIndex();
 
         addConstituents(p, tokenOffset, constituent, constituentIndices, alph);
         int end = constituent.getIndex() - 1;
