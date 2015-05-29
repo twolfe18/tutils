@@ -306,7 +306,13 @@ public class ConcreteIO {
       if (sms == null) {
         System.err.println("failed to find Propbank SRL: " + propbankSrlToolName);
       } else {
+        // What if there are no situations?
         doc.cons_propbank_gold = constituent.getIndex();
+        constituent.setParent(Document.NONE);
+        constituent.setOnlyChild(Document.NONE);
+        constituent.setLhs(alph.srl("EMPTY-SRL"));
+        constituent.setFirstToken(Document.NONE);
+        constituent.setLastToken(Document.NONE);
         int prevSit = Document.NONE;
         for (SituationMention sm : sms.getMentionList()) {
 
