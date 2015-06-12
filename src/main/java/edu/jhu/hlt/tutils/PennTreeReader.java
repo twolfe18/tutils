@@ -34,8 +34,15 @@ public class PennTreeReader {
     private int[] first;
     private int[] last;
 
+    private boolean ignoreEdited;
+
     public Indexer(Node root) {
+      this(root, true);
+    }
+
+    public Indexer(Node root, boolean ignoreEdited) {
       this.root = root;
+      this.ignoreEdited = ignoreEdited;
       this.numLeaves = 0;
       this.numNodes = 0;
       this.leaves = new Node[16];
@@ -58,6 +65,10 @@ public class PennTreeReader {
     }
 
     private void preorder(Node n) {
+      if (ignoreEdited && n.getCategory().equals("EDITED")) {
+        //Log.warn("ignoring edited node: " + n.getContents());
+        return;
+      }
       visit(n);
       for (Node c : n.getChildren())
         preorder(c);
