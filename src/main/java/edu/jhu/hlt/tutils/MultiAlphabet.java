@@ -76,6 +76,9 @@ public class MultiAlphabet {
   public String word(int i) {
     return wordAlph.lookupObject(i);
   }
+  public int numWord() {
+    return wordAlph.size();
+  }
 
   public int pos(String pos) {
     return posAlph.lookupIndex(pos, true);
