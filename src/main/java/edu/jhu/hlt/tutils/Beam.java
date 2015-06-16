@@ -3,6 +3,7 @@ package edu.jhu.hlt.tutils;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -322,7 +323,7 @@ public interface Beam<T> extends Iterable<T> {
     }
   }
 
-  public static class Item<T> implements Comparable<Item<?>> {
+  public static final class Item<T> {
     private T item;
     private double score;
 
@@ -334,15 +335,6 @@ public interface Beam<T> extends Iterable<T> {
     @Override
     public String toString() {
       return String.format("(Beam.Item %s %+.2f)", item, score);
-    }
-
-    @Override
-    public int compareTo(Item<?> o) {
-      if (o.score > score)
-        return 1;
-      if (o.score < score)
-        return -1;
-      return 0;
     }
 
     /** You can mutate the item (if you're careful), but you can never change the score */
@@ -360,7 +352,23 @@ public interface Beam<T> extends Iterable<T> {
 
     public BeamN(int width) {
       this.width = width;
-      this.beam = new TreeSet<>();
+      this.beam = new TreeSet<>(new Comparator<Item<T>>() {
+        @Override
+        public int compare(Item<T> o1, Item<T> o2) {
+          double d = o1.getScore() - o2.getScore();
+          if (d > 0) {
+            return -1;
+          } else if (d < 0) {
+            return 1;
+          } else {
+            // If we return 0, then the SortedSet will deem these two entries
+            // equivalent and drop one of them.
+            T t1 = o1.getItem();
+            T t2 = o2.getItem();
+            return ((Comparable<T>) t1).compareTo(t2);
+          }
+        }
+      });
     }
 
     public boolean push(T item, double score) {
