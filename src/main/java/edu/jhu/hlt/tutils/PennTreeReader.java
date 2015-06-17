@@ -213,7 +213,8 @@ public class PennTreeReader {
 
     @Override
     public String toString() {
-      return "<Node id=" + id + " parent=" + parent + " start=" + start + " end=" + end + ">";
+      return "<Node id=" + id + " parent=" + parent
+          + " start=" + start + " end=" + end + " cat=" + getCategory() + ">";
     }
 
     public String getTreeString() {

@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import edu.jhu.hlt.concrete.Communication;
+
 /**
  * More or less the CoNLL format in memory, with some other influences which
  * keep things very tabular.
@@ -22,6 +24,9 @@ public final class Document implements Serializable {
   private static final long serialVersionUID = 1L;
   public static final int NONE = -1;
   public static final int UNINITIALIZED = -2;
+
+  /* DEBUGGING FIELDS *********************************************************/
+  public Communication derivedFromCommunication = null;
 
   /* GENERAL FIELDS ***********************************************************/
   final String id;
