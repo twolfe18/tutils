@@ -36,12 +36,16 @@ import edu.mit.jwi.item.IWordID;
  * by name which you would like to ingest as well as extras like whether to
  * lookup/compute/add things like Brown clusters and WordNet synsets.
  *
+ * Sentences are represented as constituent nodes with the LHS equal to the
+ * {@link Section} index;
+ *
  * @author travis
  */
 public class ConcreteIO {
 
   public boolean debug = false;
   public boolean debug_cons = false;
+  public boolean includeCommunication = false;
 
   /** Only supports a single POS {@link TokenTagging} for now */
   private String posToolName = Conll2011.META_POS.getTool();
@@ -129,6 +133,9 @@ public class ConcreteIO {
   }
 
   /**
+   * Add the constituents in the given {@link Parse} to the {@link Document}
+   * using the {@link ConstituentItr}.
+   *
    * Concrete child indices are sentence-relative but Document.Constituent's are
    * document-relative. tokenOffset says how many tokens have come before this
    * parse/sentence to allow conversion.
@@ -214,16 +221,20 @@ public class ConcreteIO {
       Communication c, int docIndex, MultiAlphabet alph) {
 
     Document doc = new Document(c.getId(), docIndex, alph);
+    if (includeCommunication)
+      doc.derivedFromCommunication = c;
     Document.ConstituentItr constituent = doc.getConstituentItr(0);
     constituent.allowExpansion(true);
     doc.reserveConstituents(64);
 
     // Count the number of tokens and add the sentence sectioning
     doc.cons_sentences = constituent.getIndex();
+    int sectionIdx = 0;
     int numToks = 0;
     int prevSent = Document.NONE;
     Map<UUID, Integer> tokenizationUUID_to_tokenOffset = new HashMap<>();
-    // TODO add section segmentation
+    // TODO add section segmentation as separate constituency parse?
+    // Note that this info is already captured in the LHS of the sentence segmentation/cparse
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
 
@@ -234,6 +245,7 @@ public class ConcreteIO {
         int start = numToks;
         numToks += tkz.getTokenList().getTokenListSize();
 
+        constituent.setLhs(sectionIdx);
         constituent.setFirstToken(start);
         constituent.setLastToken(numToks - 1);
         constituent.setOnlyChild(Document.NONE);
@@ -244,6 +256,7 @@ public class ConcreteIO {
           doc.getConstituent(prevSent).setRightSib(constituent.getIndex());
         prevSent = constituent.forwards();
       }
+      sectionIdx++;
     }
 
     // Build the Document
@@ -290,8 +303,23 @@ public class ConcreteIO {
 
         addConstituents(p, tokenOffset, constituent, constituentIndices, alph);
         int end = constituent.getIndex() - 1;
-        assert end > start;
-        assert test.checkConstituencyTree(start, end);
+        if (start == end) {
+          // NOTE: There is at least one sentence in Ontonotes5 which has a
+          // parse which is something like (TOP (S (NP (-NONE- PRO)))), which
+          // has no leaf tokens. In the skel/conll (tabular format) this still
+          // has a row with no annotations. This will be as if we skipped that
+          // sentence.
+          // /home/travis/code/fnparse/data/ontonotes-release-5.0/LDC2013T19/data/files/data/english/annotations/nw/p2.5_c2e/00/p2.5_c2e_0034.parse
+          // (TOP (S (NP-SBJ (-NONE- *PRO*))))
+          Log.warn("there is an empty tree for this sentence:"
+              + " communication=" + c.getId()
+              + " section=" + s.getUuid()
+              + " sentence=" + ss.getUuid()
+              + " tokenization=" + tkz.getUuid());
+        } else {
+          assert end > start : "start=" + start + " end=" + end;
+          assert test.checkConstituencyTree(start, end);
+        }
       }
     }
 
