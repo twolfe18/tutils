@@ -32,6 +32,10 @@ import edu.jhu.hlt.tutils.Log;
 public class PropbankFrameIndex implements Serializable {
   private static final long serialVersionUID = 3986362260702735369L;
 
+  // e.g. "cease-n.xml" contains the <predicate lemma="cease_fire">
+  // If false, use "cease_file-n-1" for the id. If true use "cease-n-1".
+  public static boolean USE_FILENAME_FOR_PROP_NAME = true;
+
   // Taken from
   // file:///home/travis/code/fnparse/data/ontonotes-release-4.0/docs/propbank/english-propbank.pdf
   // as it appears to be a longer list than:
@@ -56,7 +60,10 @@ public class PropbankFrameIndex implements Serializable {
       "ARGM-ADV",
       "ARGM-ADJ",
       "LINK-SLC",
-      "LINK-PCR");
+      "LINK-PCR",
+      "ARGM-PNC",
+      "ARGM-PRR",
+      "ARGM-PRX");
 
   public static String get(NamedNodeMap attr, String key) {
     return get(attr, key, true);
@@ -102,14 +109,25 @@ public class PropbankFrameIndex implements Serializable {
      * @param rolesetNode is a "roleset" node in the Propbank XML schema
      * @param pos is the part of speech determined from the file name, e.g. "v"
      */
-    public PropbankFrame(Node rolesetNode, String pos) {
+    public PropbankFrame(File frameFile, Node rolesetNode, String pos) {
       NamedNodeMap attr = rolesetNode.getAttributes();
 
       String id = get(attr, "id", false);  // e.g. "drop.01"
       String[] idtoks = id.split("\\.");
       if (idtoks.length != 2) throw new RuntimeException();
-      this.id = idtoks[0] + "-" + pos + "-" + Integer.parseInt(idtoks[1]);
+      String pred;
+      if (USE_FILENAME_FOR_PROP_NAME) {
+        int i = frameFile.getName().lastIndexOf('.');
+        assert i == frameFile.getName().length() - 4;
+        pred = frameFile.getName().substring(0, i);
+        this.id = pred + "-" + idtoks[1].replaceFirst("^0+", "");
+      } else {
+        pred = idtoks[0];
+        this.id = pred + "-" + pos + "-" + idtoks[1].replaceFirst("^0+", "");
+      }
       // e.g. "drop-v-1"
+      // not necessarily a number at the end because of things like "take.LV",
+      // where LV == "light verb"
 
       this.vncls = get(attr, "vncls");
       this.name = get(attr, "name");
@@ -259,7 +277,7 @@ public class PropbankFrameIndex implements Serializable {
           Node n = rolesetsAndJunk.item(j);
           if (!n.getNodeName().equals("roleset"))
             continue;
-          PropbankFrame f = new PropbankFrame(n, pos);
+          PropbankFrame f = new PropbankFrame(frameFile, n, pos);
           //System.out.println("adding " + f);
           PropbankFrame old = byName.put(f.id, f);
           if (old != null)
