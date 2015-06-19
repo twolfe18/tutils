@@ -37,7 +37,7 @@ public class DiskCachedString2TFunc<T extends Serializable> {
     this.idFunc = idFunc;
     this.hash = s -> s.hashCode();
 
-    this.timer = new Timer("DiskCachedString2TFunc", 10, false);
+    this.timer = new Timer("DiskCachedString2TFunc", 100, false);
   }
 
   public void setHashFunction(Function<String, Integer> hash) {
@@ -49,6 +49,17 @@ public class DiskCachedString2TFunc<T extends Serializable> {
     if (h < 0) h = -h;
     h = h % numShards;
     return new File(cacheDir, String.format("%05d.jser.gz", h));
+  }
+
+  public List<File> getAllCacheFiles() {
+    List<File> fs = new ArrayList<>();
+    File[] x = cacheDir.listFiles();
+    if (x != null) {
+      for (File f : x)
+        if (f.getName().endsWith(".jser.gz"))
+          fs.add(f);
+    }
+    return fs;
   }
 
   @SuppressWarnings("unchecked")
@@ -78,4 +89,25 @@ public class DiskCachedString2TFunc<T extends Serializable> {
     return t;
   }
 
+  public static <R extends Serializable> DiskCachedString2TFunc<R> rehash(
+      DiskCachedString2TFunc<R> source, File cacheDir, int numShards) {
+
+    if (cacheDir.equals(source.cacheDir))
+      throw new IllegalArgumentException("need new cacheDir");
+    if (numShards == source.numShards)
+      throw new IllegalArgumentException("need new numShards");
+
+    DiskCachedString2TFunc<R> target =
+        new DiskCachedString2TFunc<R>(source.idFunc, cacheDir, numShards);
+    for (File f : source.getAllCacheFiles()) {
+      @SuppressWarnings("unchecked")
+      List<R> items = (List<R>) FileUtil.deserialize(f);
+      for (R r : items) {
+        String id = target.idFunc.apply(r);
+        target.get(id, () -> r);
+      }
+    }
+
+    return target;
+  }
 }
