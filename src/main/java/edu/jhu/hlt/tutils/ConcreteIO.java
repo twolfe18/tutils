@@ -68,14 +68,24 @@ public class ConcreteIO {
   private BrownClusters bc256, bc1000;
   private IRAMDictionary wnDict;
 
+  private Language lang;
+
   /**
    * If you provide null for any of these args it will work but just not set
    * these fields
    */
-  public ConcreteIO(BrownClusters bc256, BrownClusters bc1000, IRAMDictionary wordNet) {
+  public ConcreteIO(
+      BrownClusters bc256, BrownClusters bc1000,
+      IRAMDictionary wordNet,
+      Language lang) {
     this.bc256 = bc256;
     this.bc1000 = bc1000;
     this.wnDict = wordNet;
+    this.lang = lang;
+  }
+
+  public Language getLanguage() {
+    return lang;
   }
 
   public void setNerToolName(String toolName) {
@@ -112,11 +122,14 @@ public class ConcreteIO {
       token.setPos(alph.pos(pos.getTaggedTokenList().get(tokenIdx).getTag()));
     if (ner != null)
       token.setNer(alph.ner(ner.getTaggedTokenList().get(tokenIdx).getTag()));
-    token.setWordNocase(alph.word(w.toLowerCase()));
-    token.setShape(alph.shape(WordShape.wordShape(w)));
+
+    if (lang.isRoman()) {
+      token.setWordNocase(alph.word(w.toLowerCase()));
+      token.setShape(alph.shape(WordShape.wordShape(w)));
+    }
 
     // WordNet synset id
-    if (wnDict != null && pos != null) {
+    if (wnDict != null && pos != null && lang == Language.EN) {
       token.setWnSynset(alph.wnSynset(MultiAlphabet.UNKNOWN));
       edu.mit.jwi.item.POS wnPos = WordNetPosUtil.ptb2wordNet(token.getPosStr());
       if (wnPos != null) {
@@ -513,21 +526,26 @@ public class ConcreteIO {
     return max;
   }
 
-  public static ConcreteIO makeInstance() {
-    File bcParent = new File("/home/travis/code/fnparse/data/embeddings");
-    Log.info("loading BrownClusters (256)");
-    BrownClusters bc256 = new BrownClusters(BrownClusters.bc256dir(bcParent));
-    Log.info("loading BrownClusters (1000)");
-    BrownClusters bc1000 = new BrownClusters(BrownClusters.bc1000dir(bcParent));
-    File wnDictDir = new File("/home/travis/code/coref/data/wordnet/dict/");
-    IRAMDictionary wnDict = new RAMDictionary(wnDictDir, ILoadPolicy.IMMEDIATE_LOAD);
-    try {
-      Log.info("loading WordNet");
-      wnDict.open();
-    } catch(Exception e) {
-      throw new RuntimeException(e);
+  public static ConcreteIO makeInstance(Language lang) {
+    IRAMDictionary wnDict = null;
+    BrownClusters bc256 = null;
+    BrownClusters bc1000 = null;
+    if (lang == Language.EN) {
+      File bcParent = new File("/home/travis/code/fnparse/data/embeddings");
+      Log.info("loading BrownClusters (256)");
+      bc256 = new BrownClusters(BrownClusters.bc256dir(bcParent));
+      Log.info("loading BrownClusters (1000)");
+      bc1000 = new BrownClusters(BrownClusters.bc1000dir(bcParent));
+      File wnDictDir = new File("/home/travis/code/coref/data/wordnet/dict/");
+      wnDict = new RAMDictionary(wnDictDir, ILoadPolicy.IMMEDIATE_LOAD);
+      try {
+        Log.info("loading WordNet");
+        wnDict.open();
+      } catch(Exception e) {
+        throw new RuntimeException(e);
+      }
     }
-    ConcreteIO io = new ConcreteIO(bc256, bc1000, wnDict);
+    ConcreteIO io = new ConcreteIO(bc256, bc1000, wnDict, lang);
     return io;
   }
 

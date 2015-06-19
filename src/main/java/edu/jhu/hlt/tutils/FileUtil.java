@@ -17,6 +17,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public class FileUtil {
+  public static boolean VERBOSE = false;
 
   public static void copy(File sourceFile, File destFile) throws IOException {
     if (!destFile.exists())
@@ -50,7 +51,8 @@ public class FileUtil {
   }
 
   public static Object deserialize(File f) {
-    Log.info("reading from " + f.getPath());
+    if (VERBOSE)
+      Log.info("reading from " + f.getPath());
     Object out = null;
     try (FileInputStream fis = new FileInputStream(f)) {
       try (ObjectInputStream oos = f.getName().toLowerCase().endsWith(".gz")
@@ -65,7 +67,8 @@ public class FileUtil {
   }
 
   public static void serialize(Object obj, File f) {
-    Log.info("writing to " + f.getPath());
+    if (VERBOSE)
+      Log.info("writing to " + f.getPath());
     try (FileOutputStream fis = new FileOutputStream(f)) {
       try (ObjectOutputStream oos = f.getName().toLowerCase().endsWith(".gz")
           ? new ObjectOutputStream(new GZIPOutputStream(fis))
