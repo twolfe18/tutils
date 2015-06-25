@@ -353,6 +353,7 @@ public interface Beam<T> extends Iterable<T> {
     public BeamN(int width) {
       this.width = width;
       this.beam = new TreeSet<>(new Comparator<Item<T>>() {
+        @SuppressWarnings("unchecked")
         @Override
         public int compare(Item<T> o1, Item<T> o2) {
           double d = o1.getScore() - o2.getScore();

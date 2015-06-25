@@ -35,8 +35,7 @@ public class DiskCachedString2TFunc<T extends Serializable> {
     this.cacheDir = cacheDir;
     this.numShards = numShards;
     this.idFunc = idFunc;
-    this.hash = s -> s.hashCode();
-
+    this.hash = String::hashCode;
     this.timer = new Timer("DiskCachedString2TFunc", 100, false);
   }
 

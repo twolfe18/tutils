@@ -25,6 +25,7 @@ public interface Params<S, A> {
     public Adjoints score(S state, A action) {
       return new Adjoints.Constant(rand.nextDouble());
     }
+    @Override public String toString() { return "(Params Rand)"; }
   }
 
   /** Always returns the same score (ignores arguments) */
@@ -36,6 +37,7 @@ public interface Params<S, A> {
     public Adjoints score(S state, A action) {
       return value;
     }
+    @Override public String toString() { return "(Params Constant " + value + ")"; }
   }
 
   public static class Sum<S, A> implements Params<S, A> {
@@ -51,6 +53,14 @@ public interface Params<S, A> {
       for (int i = 0; i < n; i++)
         scores[i] = params[i].score(state, action);
       return new Adjoints.Sum(scores);
+    }
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("(Params Sum");
+      for (Params<S, A> p : params)
+        sb.append(" " + p.toString());
+      sb.append(')');
+      return sb.toString();
     }
   }
 
@@ -72,6 +82,10 @@ public interface Params<S, A> {
       if (Double.isInfinite(fa.forwards()))
         return fa;
       return new Adjoints.Sum(fa, rest.score(state, action));
+    }
+    @Override
+    public String toString() {
+      return "(Params Gaurd " + first + " " + rest + ")";
     }
   }
 }
