@@ -10,6 +10,10 @@ import java.util.Map;
 import edu.jhu.hlt.concrete.AnnotationMetadata;
 import edu.jhu.hlt.concrete.Communication;
 import edu.jhu.hlt.concrete.ConstituentRef;
+import edu.jhu.hlt.concrete.Entity;
+import edu.jhu.hlt.concrete.EntityMention;
+import edu.jhu.hlt.concrete.EntityMentionSet;
+import edu.jhu.hlt.concrete.EntitySet;
 import edu.jhu.hlt.concrete.MentionArgument;
 import edu.jhu.hlt.concrete.Parse;
 import edu.jhu.hlt.concrete.Section;
@@ -45,30 +49,35 @@ public class ConcreteIO {
 
   public boolean debug = false;
   public boolean debug_cons = false;
-  public boolean includeCommunication = false;
 
   /** Only supports a single POS {@link TokenTagging} for now */
-  private String posToolName = Conll2011.META_POS.getTool();
+  protected String posToolName = Conll2011.META_POS.getTool();
 
   /** Only supports {@link TokenTagging} style NER for now */
-  private String nerToolName = Conll2011.META_NER.getTool();
+  protected String nerToolName = Conll2011.META_NER.getTool();
 
   /** Only supports a single {@link Parse} for now */
-  private String consParseToolName = Conll2011.META_PARSE.getTool();
+  protected String consParseToolName = Conll2011.META_PARSE.getTool();
   // TODO allow this to be set set separately
-  private ConstituentType consParseToolType = ConstituentType.PTB_GOLD;
+  protected ConstituentType consParseToolType = ConstituentType.PTB_GOLD;
 
   /**
    * Assumes Propbank SRL is stored as a {@link SituationMention} using
    * {@link ConstituentRef}. See the documentation in {@link Document} for how
    * they are added to the {@link Document}.
    */
-  private String propbankSrlToolName = null;
+  protected String propbankSrlToolName = null;
 
-  private BrownClusters bc256, bc1000;
-  private IRAMDictionary wnDict;
+  /**
+   * Looks for an {@link EntitySet} matching this tool name and adds them to
+   * {@link Document#cons_coref_gold}.
+   */
+  protected String entitySetToolName = null;
 
-  private Language lang;
+  protected BrownClusters bc256, bc1000;
+  protected IRAMDictionary wnDict;
+
+  protected Language lang;
 
   /**
    * If you provide null for any of these args it will work but just not set
@@ -102,6 +111,10 @@ public class ConcreteIO {
 
   public void setPropbankToolname(String toolName) {
     this.propbankSrlToolName = toolName;
+  }
+
+  public void setCorefToolname(String toolName) {
+    this.entitySetToolName = toolName;
   }
 
   /** Returns a Token with word, pos, and ner initialized */
@@ -146,6 +159,96 @@ public class ConcreteIO {
   }
 
   /**
+   * Adds the coreference clustering represented by coref as constituents in
+   * the document (see {@link Document#cons_coref_gold} for documentation on
+   * the representation).
+   * @param mapping may be null
+   * @return the first Constituent (which is a pointer to an {@link Entity} and
+   * also a linked list representing a {@link EntitySet}) added or null if coref
+   * is empty.
+   */
+  public static Constituent addCorefConstituents(
+      EntitySet coref,
+      EntityMentionSet mentions,
+      Document.ConstituentItr cons,
+      ConcreteDocumentMapping mapping,
+      MultiAlphabet alph) {
+
+    int added = 0;
+    Document doc = cons.getDocument();
+    Constituent start = doc.getConstituent(cons.getIndex());
+
+    Map<UUID, EntityMention> ems = indexByUUID(mentions.getMentionList());
+
+    int prevEnt = Document.NONE;
+    for (Entity ent : coref.getEntityList()) {          // LOOP over Entities
+
+      if (ent.getMentionIdListSize() == 0)
+        throw new RuntimeException("empty Entity?");
+
+      Constituent entC = cons.forwardsC();
+      entC.setParent(Document.NONE);
+      entC.setLhs(alph.word(ent.getType()));
+      entC.setOnlyChild(cons.getIndex());
+      entC.setLeftSib(prevEnt);
+      entC.setRightSib(Document.NONE);
+      if (prevEnt != Document.NONE)
+        doc.getConstituent(prevEnt).setRightSib(entC.getIndex());
+      prevEnt = entC.getIndex();
+
+      // Update mapping: Entity.UUID
+      mapping.put(entC, ent.getUuid());
+
+      int prevMention = Document.NONE;
+      for (UUID emId : ent.getMentionIdList()) {        // LOOP over Mentions
+
+        // Update mapping: EntityMention.UUID
+        mapping.put(doc.getConstituent(cons.getIndex()), emId);
+
+        EntityMention em = ems.get(emId);
+        TokenRefSequence trs = em.getTokens();
+        List<Integer> tokens = trs.getTokenIndexList();
+        if (!ascending(tokens))
+          throw new RuntimeException("can't handle split sequences");
+        // Convert from sentence-relative to document-relative
+        Document.Constituent sentence = mapping.get(trs.getTokenizationId());
+        int first = sentence.getFirstToken() + tokens.get(0);
+        int last = sentence.getFirstToken() + tokens.get(tokens.size() - 1);
+
+        entC.setRightChild(cons.getIndex());
+        cons.setLhs(entC.getLhs());
+        cons.setParent(entC.getIndex());
+        cons.setOnlyChild(Document.NONE);
+        cons.setFirstToken(first);
+        cons.setLastToken(last);
+        cons.setLeftSib(prevMention);
+        cons.setRightSib(Document.NONE);
+        if (prevMention != Document.NONE)
+          doc.getConstituent(prevMention).setRightSib(cons.getIndex());
+        prevMention = cons.getIndex();
+        cons.forwards();
+        added++;
+      }
+    }
+
+    if (added == 0) {
+      Log.warn("empty EntitySet? " + coref.getUuid());
+      return null;
+    }
+    return start;
+  }
+
+  public static boolean ascending(List<Integer> numbers) {
+    if (numbers.isEmpty())
+      return false;
+    int first = numbers.get(0);
+    for (int i = 1; i < numbers.size(); i++)
+      if (numbers.get(i) != first + i)
+        return false;
+    return true;
+  }
+
+  /**
    * Add the constituents in the given {@link Parse} to the {@link Document}
    * using the {@link ConstituentItr}.
    *
@@ -153,7 +256,7 @@ public class ConcreteIO {
    * document-relative. tokenOffset says how many tokens have come before this
    * parse/sentence to allow conversion.
    */
-  public void addConstituents(
+  public void addParseConstituents(
       Parse p,
       int tokenOffset,
       Document.ConstituentItr cons,
@@ -230,12 +333,15 @@ public class ConcreteIO {
     }
   }
 
-  public Document communication2Document(
+  /**
+   * Convert a {@link Communication} into a {@link Document}.
+   * @param mapping may be null
+   */
+  public ConcreteDocumentMapping communication2Document(
       Communication c, int docIndex, MultiAlphabet alph) {
 
     Document doc = new Document(c.getId(), docIndex, alph);
-    if (includeCommunication)
-      doc.derivedFromCommunication = c;
+    ConcreteDocumentMapping mapping = new ConcreteDocumentMapping(c, doc);
     Document.ConstituentItr constituent = doc.getConstituentItr(0);
     constituent.allowExpansion(true);
     doc.reserveConstituents(64);
@@ -245,18 +351,17 @@ public class ConcreteIO {
     int sectionIdx = 0;
     int numToks = 0;
     int prevSent = Document.NONE;
-    Map<UUID, Integer> tokenizationUUID_to_tokenOffset = new HashMap<>();
     // TODO add section segmentation as separate constituency parse?
     // Note that this info is already captured in the LHS of the sentence segmentation/cparse
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
 
         Tokenization tkz = ss.getTokenization();
-        Integer i = tokenizationUUID_to_tokenOffset.put(tkz.getUuid(), numToks);
-        if (i != null) throw new RuntimeException();
-
         int start = numToks;
         numToks += tkz.getTokenList().getTokenListSize();
+
+        // Update mapping: Document.Constituent <=> Tokenization.UUID
+        mapping.put(doc.getConstituent(constituent.getIndex()), tkz.getUuid());
 
         constituent.setLhs(sectionIdx);
         constituent.setFirstToken(start);
@@ -314,7 +419,7 @@ public class ConcreteIO {
           doc.getConstituent(prevParse).setRightSib(constituent.getIndex());
         prevParse = constituent.getIndex();
 
-        addConstituents(p, tokenOffset, constituent, constituentIndices, alph);
+        addParseConstituents(p, tokenOffset, constituent, constituentIndices, alph);
         int end = constituent.getIndex() - 1;
         if (start == end) {
           // NOTE: There is at least one sentence in Ontonotes5 which has a
@@ -373,7 +478,7 @@ public class ConcreteIO {
           // Set the predicate
           // first/last tokens + left/right children
           setupConstituent(sm.getConstituent(), sm.getTokens(), constituent,
-              constituentIndices, tokenizationUUID_to_tokenOffset, doc);
+              constituentIndices, mapping, doc);
           // Everything else
           constituent.setLhs(alph.srl(sm.getSituationKind()));
           constituent.setParent(sit.getIndex());
@@ -414,7 +519,7 @@ public class ConcreteIO {
             MentionArgument arg = sm.getArgumentList().get(ai);
             // first/last tokens + left/right children
             setupConstituent(arg.getConstituent(), arg.getTokens(), constituent,
-                constituentIndices, tokenizationUUID_to_tokenOffset, doc);
+                constituentIndices, mapping, doc);
             // Everything else
             constituent.setLhs(alph.srl(arg.getRole()));
             constituent.setParent(sit.getIndex());
@@ -458,11 +563,20 @@ public class ConcreteIO {
       }
     }
 
+    // Add coref
+    if (entitySetToolName != null) {
+      EntitySet es = findByTool(c.getEntitySetList(), entitySetToolName);
+      if (!es.isSetMentionSetId())
+        throw new RuntimeException("implement EntityMentionSet finder");
+      EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
+      addCorefConstituents(es, ems, constituent, mapping, alph);
+    }
+
     // Compute BrownClusters
     if (bc256 != null || bc1000 != null)
       BrownClusters.setClusters(doc, bc256, bc1000);
 
-    return doc;
+    return mapping;
   }
 
   /**
@@ -479,7 +593,7 @@ public class ConcreteIO {
       TokenRefSequence trs,
       ConstituentItr constituent,
       Map<ConstituentRef, Integer> constituentIndices,
-      Map<UUID, Integer> tokenizationUUID_to_tokenOffset,
+      ConcreteDocumentMapping mapping,  // used for Tokenization.UUID => Constituent => firstToken
       Document doc) {
     if (cr != null) {
       if (debug)
@@ -491,7 +605,7 @@ public class ConcreteIO {
         Log.info("making constituent from TokenRefSequence");
       if (trs == null)
         throw new IllegalArgumentException();
-      int tokenOffset = tokenizationUUID_to_tokenOffset.get(trs.getTokenizationId());
+      int tokenOffset = mapping.get(trs.getTokenizationId()).getFirstToken();
       int s = tokenOffset + min(trs.getTokenIndexList());
       int e = tokenOffset + max(trs.getTokenIndexList());
       // Insert dummy constituent/span
@@ -547,6 +661,32 @@ public class ConcreteIO {
     }
     ConcreteIO io = new ConcreteIO(bc256, bc1000, wnDict, lang);
     return io;
+  }
+
+  public static <T> T findByUUID(List<T> items, UUID id) {
+    T match = null;
+    List<UUID> possible = new ArrayList<>();
+    for (T t : items) {
+      try {
+        Method m = t.getClass().getMethod("getId");
+        UUID am = (UUID) m.invoke(t);
+        possible.add(am);
+        if (id.equals(am)) {
+          if (match != null) {
+            throw new RuntimeException("non-unique UUID \""
+                + id + "\" in " + possible);
+          }
+          match = t;
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+    if (match == null) {
+      throw new RuntimeException("couldn't find tool named \""
+          + id + "\" in " + possible);
+    }
+    return match;
   }
 
   public static <T> T findByTool(List<T> items, String toolname) {

@@ -6,11 +6,13 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import edu.jhu.hlt.concrete.Communication;
-
 /**
  * More or less the CoNLL format in memory, with some other influences which
  * keep things very tabular.
+ *
+ * TODO keep a `top` pointer for the next available constituent and token. This
+ * is useful so that you don't need to carry around a single ConstituentItr to
+ * any place you might want to add a constituent to.
  *
  * TODO figure out a scheme by which we can de-allocate some of these token
  * indexed fields (e.g. checking if all the values are -2, then set to null).
@@ -24,9 +26,6 @@ public final class Document implements Serializable {
   private static final long serialVersionUID = 1L;
   public static final int NONE = -1;
   public static final int UNINITIALIZED = -2;
-
-  /* DEBUGGING FIELDS *********************************************************/
-  public Communication derivedFromCommunication = null;
 
   /* GENERAL FIELDS ***********************************************************/
   final String id;
@@ -166,6 +165,16 @@ public final class Document implements Serializable {
   public int cons_propbank_auto = NONE;
   public int cons_ner_gold = NONE;
   public int cons_ner_auto = NONE;
+
+  // Linked list (use rightSib) of mentions for coref
+  public int cons_coref_mention_gold = NONE;
+  public int cons_coref_mention_auto = NONE;
+
+  // Depth 2 tree (top level is entities, second level is mentions)
+  // Entity level: lhs=Entity.type
+  // Mention level: lhs=Entity.type
+  public int cons_coref_gold = NONE;
+  public int cons_coref_auto = NONE;
 
   // First tokens of paragraphs and sentences
   int[] breaks;
@@ -602,7 +611,18 @@ public final class Document implements Serializable {
     public int getWidth() {
       return (lastToken[index] - firstToken[index]) + 1;
     }
-
+    @Override
+    public int hashCode() {
+      return Document.this.id.hashCode() ^ index;
+    }
+    @Override
+    public boolean equals(Object other) {
+      if (other instanceof Constituent) {
+        Constituent c = (Constituent) other;
+        return index == c.index && Document.this == c.getDocument();
+      }
+      return false;
+    }
     public String showSubtree(MultiAlphabet alph) {
       ConstituentItr ci = new ConstituentItr(getIndex());
 
