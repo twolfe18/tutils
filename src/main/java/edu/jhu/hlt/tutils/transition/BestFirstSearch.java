@@ -55,6 +55,8 @@ public class BestFirstSearch<S, A> implements Runnable {
   private int beamSize;
   public boolean debug = false;
 
+  public int mode = 2;
+
   public BestFirstSearch(
       TransitionFunction<S, A> transitionFunction,
       Params<S, A> model, S initialState, int beamSize) {
@@ -69,8 +71,65 @@ public class BestFirstSearch<S, A> implements Runnable {
     this.maxBeam = Beam.getMostEfficientImpl(1);
   }
 
+  public void run2() {
+
+    if (debug)
+      Log.info("starting with model=" + model);
+
+    Beam<ScoredState<S>> frontier = Beam.getMostEfficientImpl(beamSize);
+    Adjoints score0 = Adjoints.Constant.ZERO;
+    frontier.push(new ScoredState<>(initialState, score0, null), score0.forwards());
+    while (frontier.size() > 0) {
+
+      Beam<ScoredState<S>> newFrontier = Beam.getMostEfficientImpl(beamSize);
+
+      Beam.Item<ScoredState<S>> bestItem = frontier.popItem();
+      ScoredState<S> best = bestItem.getItem();
+      double scoreSoFar = bestItem.getScore();
+
+      Iterator<A> actionItr = transitionFunc.next(best.state);
+      while (actionItr.hasNext()) {
+        A action = actionItr.next();
+        Adjoints partial = model.score(best.state, action);
+        double fullScore = scoreSoFar + partial.forwards();
+        if (debug) {
+          Log.info("partialScore=" + partial.forwards() + " fullScore=" + fullScore + " newFrontier.minScore=" + newFrontier.minScore() + " action=" + action);
+        }
+        if (fullScore > newFrontier.minScore()) {
+          S next = transitionFunc.apply(best.state, action);
+          newFrontier.push(new ScoredState<>(next, partial, best), fullScore);
+        }
+      }
+
+      if (debug)
+        Log.info("done iter, frontier.size=" + frontier.size() + " newFrontier.size=" + newFrontier.size());
+
+      if (newFrontier.size() == 0)
+        maxBeam.push(bestItem);
+      else
+        frontier = newFrontier;
+    }
+    if (debug) {
+      Log.info("returning with maxBeam.peek=" + maxBeam.peek());
+    }
+  }
+
   @Override
   public void run() {
+    Log.info("mode=" + mode);
+    switch (mode) {
+      case 1:
+        run1();
+        break;
+      case 2:
+        run2();
+        break;
+      default:
+        throw new RuntimeException();
+    }
+  }
+
+  public void run1() {
     Beam<ScoredState<S>> frontier = Beam.getMostEfficientImpl(beamSize);
     Adjoints score0 = Adjoints.Constant.ZERO;
     frontier.push(new ScoredState<>(initialState, score0, null), score0.forwards());
@@ -88,7 +147,9 @@ public class BestFirstSearch<S, A> implements Runnable {
       // Add it to the running best
       boolean maxBest = maxBeam.push(bestItem);
       if (debug && maxBest) {
-        assert bestItem.getScore() == best.score.forwards();
+        double b1 = bestItem.getScore();
+        double b2 = best.getFullScore();
+        assert b1 == b2 : "b1=" + b1 + " b2=" + b2;
         Log.info("this is current best on maxBeam with score " + bestItem.getScore());
       }
 
@@ -96,11 +157,13 @@ public class BestFirstSearch<S, A> implements Runnable {
       Iterator<A> actionItr = transitionFunc.next(best.state);
       while (actionItr.hasNext()) {
         A action = actionItr.next();
-        if (debug) {
-          Log.info("considering action: " + action);
-        }
         Adjoints partial = model.score(best.state, action);
         double fullScore = scoreSoFar + partial.forwards();
+        if (debug) {
+          Log.info("considering action: " + action
+              + " partial=" + partial.forwards()
+              + " full=" + fullScore);
+        }
         if (fullScore > frontier.minScore()) {
 //          Adjoints full = new Adjoints.Sum(best.score, partial);
           S next = transitionFunc.apply(best.state, action);
