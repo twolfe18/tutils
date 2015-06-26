@@ -68,8 +68,12 @@ public class NetworkParameterAveraging {
      * construct one (it doesn't know how).
      */
     public Server(AvgParams zero) {
-      average = zero;
-      port = SERVER_PORT;
+      this(zero, SERVER_PORT);
+    }
+
+    public Server(AvgParams zero, int port) {
+      this.average = zero;
+      this.port = port;
     }
 
     private File checkpointDir;
@@ -82,6 +86,10 @@ public class NetworkParameterAveraging {
         throw new IllegalArgumentException();
       this.checkpointDir = checkpointDir;
       this.saveIntervalInSeconds = saveIntervalInSecons;
+    }
+
+    public int getPort() {
+      return port;
     }
 
     public AvgParams getParams() {
@@ -181,9 +189,13 @@ public class NetworkParameterAveraging {
     public boolean debug = false;
  
     public Client(Params params, String serverHostName) {
+      this(params, serverHostName, SERVER_PORT);
+    }
+
+    public Client(Params params, String serverHostName, int port) {
       this.params = params;
       this.serverHostName = serverHostName;
-      this.serverPort = SERVER_PORT;
+      this.serverPort = port;
       this.timer = new TimeMarker();
       timer.enoughTimePassed(1);
     }

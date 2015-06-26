@@ -46,6 +46,7 @@ public class NetworkDenseParams implements NetworkParameterAveraging.Params {
       dos.writeInt(weights.length);
       for (int i = 0; i < weights.length; i++)
         dos.writeDouble(weights[i]);
+      dos.flush();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -88,6 +89,7 @@ public class NetworkDenseParams implements NetworkParameterAveraging.Params {
         dos.writeInt(weights.length);
         for (int i = 0; i < weights.length; i++)
           dos.writeDouble(weights[i] / adds);
+        dos.flush();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
