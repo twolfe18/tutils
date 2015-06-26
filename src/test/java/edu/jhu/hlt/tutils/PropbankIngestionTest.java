@@ -38,7 +38,7 @@ public class PropbankIngestionTest {
     // TODO no autocomplete?
 
     System.out.println("converting");
-    Document d = cio.communication2Document(c, docIndex++, alph);
+    Document d = cio.communication2Document(c, docIndex++, alph).getDocument();
     System.out.println(d);
 
     DocumentTester test = new DocumentTester(d, true);
