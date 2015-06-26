@@ -111,6 +111,7 @@ public class NetworkParameterAveraging {
     public void run() {
       try {
         TimeMarker timer = new TimeMarker();
+        @SuppressWarnings("resource")
         ServerSocket ss = new ServerSocket(port);
         while (true) {
           synchronized (average) {
@@ -150,6 +151,10 @@ public class NetworkParameterAveraging {
       }
     }
 
+    /**
+     * Remember that this is saving the *sum* in {@link AvgParams}, and that
+     * you have to make sure you call the getAverage method out.
+     */
     private void saveModel() {
       // Remove the oldest file
       int maxFiles = 10;
@@ -204,6 +209,14 @@ public class NetworkParameterAveraging {
       return params;
     }
 
+    public String getServerHostName() {
+      return serverHostName;
+    }
+
+    public int getServerHostPort() {
+      return serverPort;
+    }
+
     /**
      * Call this every time the parameters change, and this will occasionally
      * trigger communication with the server in order to average parameters.
@@ -223,8 +236,7 @@ public class NetworkParameterAveraging {
 
     public void averageParameters() throws UnknownHostException, IOException {
       synchronized (params) {
-        if (debug)
-          Log.info("sending params to: " + serverHostName + ":" + serverPort);
+        Log.info("sending params to: " + serverHostName + ":" + serverPort);
         Socket s = new Socket(serverHostName, serverPort);
         InputStream is = s.getInputStream();
         OutputStream os = s.getOutputStream();

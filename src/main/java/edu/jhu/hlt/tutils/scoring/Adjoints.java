@@ -80,8 +80,8 @@ public interface Adjoints {
   public static class Linear implements Adjoints {
     private final IntDoubleVector theta;      // not owned by this class
     private final IntDoubleVector features;
-    private double cachedDotProd;
-    private boolean computedCache = false;
+//    private double cachedDotProd;
+//    private boolean computedCache = false;
 
     public Linear(IntDoubleVector theta, IntDoubleVector features) {
       this.theta = theta;
@@ -90,11 +90,12 @@ public interface Adjoints {
 
     @Override
     public double forwards() {
-      if (!computedCache) {
-        cachedDotProd = theta.dot(features);
-        computedCache = true;
-      }
-      return cachedDotProd;
+//      if (!computedCache) {
+//        cachedDotProd = theta.dot(features);
+//        computedCache = true;
+//      }
+//      return cachedDotProd;
+      return theta.dot(features);
     }
 
     @Override
