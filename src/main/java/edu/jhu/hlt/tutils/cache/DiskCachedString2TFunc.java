@@ -9,6 +9,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import edu.jhu.hlt.tutils.FileUtil;
+import edu.jhu.hlt.tutils.LazyIteration;
 import edu.jhu.hlt.tutils.Timer;
 
 /**
@@ -59,6 +60,17 @@ public class DiskCachedString2TFunc<T extends Serializable> {
           fs.add(f);
     }
     return fs;
+  }
+
+  public Iterable<T> getAllValues() {
+    @SuppressWarnings("unchecked")
+    Function<File, List<T>> read = f -> {
+      return (List<T>) FileUtil.deserialize(f);
+    };
+    Iterable<List<T>> itr =
+        new LazyIteration.FIterable<>(getAllCacheFiles(), read);  // map
+    Iterable<T> itr2 = new LazyIteration.FlatIterable<T>(itr);    // flatten
+    return itr2;
   }
 
   @SuppressWarnings("unchecked")
