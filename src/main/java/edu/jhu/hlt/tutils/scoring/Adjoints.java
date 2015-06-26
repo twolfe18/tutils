@@ -32,6 +32,10 @@ public interface Adjoints {
     public void backwards(double dErr_dForwards) {
       // No-op
     }
+    @Override
+    public String toString() {
+      return "(Constant " + value + ")";
+    }
 
     public static final Constant ONE = new Constant(1d);
     public static final Constant ZERO = new Constant(0d);
@@ -57,6 +61,14 @@ public interface Adjoints {
     public void backwards(double dErr_dForwards) {
       for (Adjoints a : items)
         a.backwards(dErr_dForwards);
+    }
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("(Sum");
+      for (Adjoints a : items)
+        sb.append(" " + a);
+      sb.append(')');
+      return sb.toString();
     }
   }
 
@@ -90,7 +102,7 @@ public interface Adjoints {
       // Ideally I would fuse these operations, but I don't think this can be
       // done without runtime type inspection.
       IntDoubleVector update = features.copy();
-      update.scale(-dErr_dForwards);
+      update.scale(-dErr_dForwards * getStepSize());
       theta.add(update);
     }
 
