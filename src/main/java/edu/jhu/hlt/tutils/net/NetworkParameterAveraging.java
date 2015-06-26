@@ -1,5 +1,7 @@
 package edu.jhu.hlt.tutils.net;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -7,6 +9,9 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.zip.GZIPOutputStream;
 
 import edu.jhu.hlt.tutils.Log;
 import edu.jhu.hlt.tutils.TimeMarker;
@@ -20,6 +25,9 @@ import edu.jhu.hlt.tutils.TimeMarker;
  * the server, the server updates its running average, then the server sends the
  * updated running average to the client. Clients may choose how often they wish
  * to send/receive parameter updates.
+ *
+ * TODO Should I scrap this whole thing and use redis?
+ * http://redis.io/commands/incrbyfloat
  *
  * @author travis
  */
@@ -64,6 +72,18 @@ public class NetworkParameterAveraging {
       port = SERVER_PORT;
     }
 
+    private File checkpointDir;
+    private int saveIntervalInSeconds;
+    public void saveModels(File checkpointDir, int saveIntervalInSecons) {
+      Log.info("saving parameters to " + checkpointDir.getPath() + " every " + saveIntervalInSecons + " seconds");
+      if (!checkpointDir.isDirectory() || checkpointDir.listFiles().length > 0)
+        throw new IllegalArgumentException("must provide an empty directory");
+      if (saveIntervalInSecons < 1)
+        throw new IllegalArgumentException();
+      this.checkpointDir = checkpointDir;
+      this.saveIntervalInSeconds = saveIntervalInSecons;
+    }
+
     public AvgParams getParams() {
       return average;
     }
@@ -82,6 +102,7 @@ public class NetworkParameterAveraging {
     @Override
     public void run() {
       try {
+        TimeMarker timer = new TimeMarker();
         ServerSocket ss = new ServerSocket(port);
         while (true) {
           synchronized (average) {
@@ -109,10 +130,42 @@ public class NetworkParameterAveraging {
               Log.info("done transaction, cleaning up");
 
             client.close();
+
+
+            // Check if we should save the parameters
+            if (checkpointDir != null && timer.enoughTimePassed(saveIntervalInSeconds))
+              saveModel();
           }
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
+      }
+    }
+
+    private void saveModel() {
+      // Remove the oldest file
+      int maxFiles = 10;
+      File[] old = checkpointDir.listFiles();
+      if (old != null && old.length >= maxFiles) {
+        Arrays.sort(old, new Comparator<File>() {
+          @Override
+          public int compare(File o1, File o2) {
+            long d = o1.lastModified() - o2.lastModified();
+            assert d < Integer.MAX_VALUE && d > Integer.MIN_VALUE;
+            return (int) d;
+          }
+        });
+        Log.info("removing " + old[0].getPath() + " to make room, maxFiles=" + maxFiles);
+        old[0].delete();
+      }
+
+      // Save the current one
+      File f = new File(checkpointDir,
+          "average-" + (System.currentTimeMillis()/1000) + ".jser.gz");
+      try (FileOutputStream fos = new FileOutputStream(f)) {
+        average.getAverage(new GZIPOutputStream(fos));
+      } catch (Exception e) {
+        e.printStackTrace();
       }
     }
   }
