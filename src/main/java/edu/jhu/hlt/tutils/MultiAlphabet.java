@@ -29,6 +29,7 @@ import edu.jhu.prim.bimap.IntObjectBimap;
 public class MultiAlphabet {
 
   public static final String UNKNOWN = "UNKNOWN";
+  public static final String NULL = "tHE-nULL-sTRING";  // how null is (de)serialized
 
   /** For things that can produce a pretty string if given an alphabet */
   public static interface Showable {
@@ -178,8 +179,15 @@ public class MultiAlphabet {
           assert toks.length == 3;
           IntObjectBimap<String> m = rep.get(toks[0]);
           read.increment(toks[0]);
+
+          // Need to handle null<->String carefully in order to allow the
+          // string "null" to be valid.
+          if (NULL.equals(toks[2]))
+            toks[2] = null;
+
           int i = m.lookupIndex(toks[2], true);
-          assert i == Integer.parseInt(toks[1]);
+          assert i == Integer.parseInt(toks[1]) :
+            "toks=" + Arrays.toString(toks) + " i=" + i;
         }
         // Report on the size and how many were read
         for (Entry<String, IntObjectBimap<String>> x : a.representation().entrySet()) {
@@ -211,6 +219,12 @@ public class MultiAlphabet {
           int n = map.size();
           for (int i = 0; i < n; i++) {
             String value = map.lookupObject(i);
+
+            // Need to handle null<->String carefully in order to allow the
+            // string "null" to be valid.
+            if (value == null)
+              value = NULL;
+
             w.write(name + "\t" + i + "\t" + value + "\n");
           }
         }
