@@ -3,8 +3,10 @@ package edu.jhu.hlt.tutils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * More or less the CoNLL format in memory, with some other influences which
@@ -159,10 +161,16 @@ public final class Document implements Serializable {
   public int cons_sentences = NONE;  // index of constituent corresponding to the first sentence
   public int cons_paragraph = NONE;
   public int cons_section = NONE;
+
+  // top level is linked list of cparses for sentences
   public int cons_ptb_gold = NONE;
   public int cons_ptb_auto = NONE;
+
+  // top level is linked list of items like (PROP ... (ARG ...) (ARG ...) ...)
   public int cons_propbank_gold = NONE;
   public int cons_propbank_auto = NONE;
+
+  // top level is linked list of (NER lhs=type firstToken=i lastToken=j)
   public int cons_ner_gold = NONE;
   public int cons_ner_auto = NONE;
 
@@ -180,10 +188,6 @@ public final class Document implements Serializable {
   int[] breaks;
 
   /* CONSTITUENT-INDEXED FIELDS ***********************************************/
-  // NEW: type is implicit from whether you got this constituent from
-  // cons_parent_ptb_auto vs cons_parent_propbank_gold, etc.
-//  int[] cons_type;    // Used to say things like what parser generated this.
-  // TODO maybe rename this to "tag"
   int[] lhs;          // left hand side of a CFG rule, e.g. "NP" or "SBAR", NOT a POS tag (that would mean 1 Constituent per word, we want to stay one level higher than that)
 
   int[] leftChild;    // < 0 for leaf nodes
@@ -207,8 +211,50 @@ public final class Document implements Serializable {
   // than that, then I may have to give up on the simplicity of uniform
   // constituency trees.
 
+  // TODO Concerning the problem of fitting enough information into `lhs` and
+  // the need for features: I think I'm going to have to add
+  // constituent -> FeatureVector and token -> FeatureVector
+  // mappings.
 
   /* END OF FIELDS ************************************************************/
+
+
+  /* CONVENIENCE METHODS ******************************************************/
+
+  /**
+   * Returns a map from (firstToken,lastToken) to constituentIndex for all
+   * constituents in the link list pointed to by firstConsIdx. This assumes that
+   * the Constituents are from a cparse, and therefore everything under the
+   * items in the linked list are cparse constituents with first and last tokens
+   * set.
+   */
+  public Map<IntPair, Integer> getSpanToConstituentMapping(int firstConsIdx) {
+    Map<IntPair, Integer> cons = new HashMap<>();
+    for (ConstituentItr ci = getConstituentItr(firstConsIdx); ci.isValid(); ci.gotoRightSib()) {
+      if (ci.getLeftChild() != ci.getRightChild())
+        Log.warn("cparses should have one root: cons=" + ci.getIndex() + " doc=" + id);
+      for (ConstituentItr root = getConstituentItr(ci.getLeftChild()); root.isValid(); root.gotoRightSib())
+        addCparseSpans(cons, root);
+    }
+    return cons;
+  }
+  /** Keeps the shallowest (closest to root) span if they're not all unique */
+  private static void addCparseSpans(Map<IntPair, Integer> m, Constituent c) {
+    int f = c.getFirstToken();
+    int l = c.getLastToken();
+    if (f < 0 || l < 0 || l < f)
+      throw new IllegalArgumentException("f=" + f + " l=" + l);
+    IntPair k = new IntPair(f, l);
+    int v = c.getIndex();
+    Integer old = m.put(k, v);
+    if (old != null) {
+      int oldDepth = c.getDocument().getConstituent(old).getDepth();
+      assert c.getDepth() < 0 || oldDepth < 0 || oldDepth < c.getDepth();
+      m.put(k, old);  // put back the old (shallower) constituent)
+    }
+  }
+
+  /* END OF CONVENIENCE METHODS ***********************************************/
 
   public Document(String id, int index, MultiAlphabet alph) {
     this.id = id;
