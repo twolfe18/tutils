@@ -45,7 +45,7 @@ import edu.mit.jwi.item.IWordID;
  *
  * @author travis
  */
-public class ConcreteIO {
+public class ConcreteToDocument {
 
   public boolean debug = false;
   public boolean debug_cons = false;
@@ -83,7 +83,7 @@ public class ConcreteIO {
    * If you provide null for any of these args it will work but just not set
    * these fields
    */
-  public ConcreteIO(
+  public ConcreteToDocument(
       BrownClusters bc256, BrownClusters bc1000,
       IRAMDictionary wordNet,
       Language lang) {
@@ -159,7 +159,7 @@ public class ConcreteIO {
   }
 
   /**
-   * Adds the coreference clustering represented by coref as constituents in
+   * Returns the coreference clustering represented by coref as constituents in
    * the document (see {@link Document#cons_coref_gold} for documentation on
    * the representation).
    * @param mapping may be null
@@ -177,6 +177,15 @@ public class ConcreteIO {
     int added = 0;
     Document doc = cons.getDocument();
     Constituent start = doc.getConstituent(cons.getIndex());
+
+    // In the event that there are no entities in this coreference set
+    // (this is allowed, there must be 1+ mentions in each entity, but there
+    // can be 0 entities in a EntitySet).
+    start.setLhs(alph.word("NullEntity"));  // more for debugging than processing
+    start.setParent(Document.NONE);
+    start.setOnlyChild(Document.NONE);
+    start.setLeftSib(Document.NONE);
+    start.setRightSib(Document.NONE);
 
     Map<UUID, EntityMention> ems = indexByUUID(mentions.getMentionList());
 
@@ -231,10 +240,8 @@ public class ConcreteIO {
       }
     }
 
-    if (added == 0) {
-      Log.warn("empty EntitySet? " + coref.getUuid());
-      return null;
-    }
+    if (added == 0)
+      Log.warn("empty EntitySet? coref=" + coref);
     return start;
   }
 
@@ -333,9 +340,138 @@ public class ConcreteIO {
     }
   }
 
+  public Constituent addPropbankSrl(
+      Communication c,
+      String situationMentionSetToolName,
+      Map<ConstituentRef, Integer> constituentIndices,  // TODO fold into mapping
+      ConcreteDocumentMapping mapping,
+      Document.ConstituentItr constituent,
+      MultiAlphabet alph) {
+
+    Document doc = constituent.getDocument();
+    assert doc == mapping.getDocument();
+
+    Constituent first = null;
+    SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), situationMentionSetToolName);
+    if (sms == null) {
+      System.err.println("failed to find SituationMentionSet by tool: " + situationMentionSetToolName);
+    } else {
+      // What if there are no situations?
+      first = doc.getConstituent(constituent.getIndex());
+      constituent.setParent(Document.NONE);
+      constituent.setOnlyChild(Document.NONE);
+      constituent.setLhs(alph.srl("EMPTY-SRL"));
+      constituent.setFirstToken(Document.NONE);
+      constituent.setLastToken(Document.NONE);
+      constituent.setLeftSib(Document.NONE);
+      constituent.setRightSib(Document.NONE);
+      int prevSit = Document.NONE;
+      for (SituationMention sm : sms.getMentionList()) {
+
+        // Make a situation node which is the parent of all the pred/args
+        Constituent sit = constituent.forwardsC();
+        sit.setLhs(alph.srl("propbank"));
+        sit.setLeftSib(prevSit);
+        sit.setRightSib(Document.NONE); // will be over-written
+        sit.setParent(Document.NONE);
+        if (prevSit != Document.NONE)
+          doc.getConstituent(prevSit).setRightSib(sit.getIndex());
+        prevSit = sit.getIndex();
+
+        // Constituent index of previous pred/arg
+        int prev = Document.NONE;
+
+        // Set the predicate
+        // first/last tokens + left/right children
+        setupConstituent(sm.getConstituent(), sm.getTokens(), constituent,
+            constituentIndices, mapping, doc);
+        // Everything else
+        constituent.setLhs(alph.srl(sm.getSituationKind()));
+        constituent.setParent(sit.getIndex());
+        constituent.setLeftSib(Document.NONE);
+        constituent.setRightSib(Document.NONE);
+
+        // Set sit -> pred
+        sit.setLeftChild(constituent.getIndex());
+        sit.setRightChild(constituent.getIndex());
+        if (debug) {
+          Log.info("adding Situation text=\"" + sm.getText()
+              + "\" first=" + constituent.getFirstToken()
+              + " last=" + constituent.getLastToken());
+        }
+
+        // Set the parent links (verb token -> propbank cons node)
+        assert constituent.getFirstToken() >= 0;
+        assert constituent.getLastToken() >= 0;
+        int[] parents = doc.getConsParent(ConstituentType.PROPBANK_GOLD);
+        for (int tokI = constituent.getFirstToken(); tokI <= constituent.getLastToken(); tokI++) {
+          parents[tokI] = constituent.getIndex();
+        }
+
+        if (debug) {
+          Log.info("pred.firstToken=" + constituent.getFirstToken()
+              + " pred.lastToken=" + constituent.getLastToken());
+        }
+
+        // Store the bounds of the entire situation
+        int firstT = constituent.getFirstToken();
+        int lastT = constituent.getLastToken();
+
+        prev = constituent.forwards();
+
+        // Set the arguments
+        int numArgs = sm.getArgumentListSize();
+        for (int ai = 0; ai < numArgs; ai++) {
+          MentionArgument arg = sm.getArgumentList().get(ai);
+          // first/last tokens + left/right children
+          setupConstituent(arg.getConstituent(), arg.getTokens(), constituent,
+              constituentIndices, mapping, doc);
+          // Everything else
+          constituent.setLhs(alph.srl(arg.getRole()));
+          constituent.setParent(sit.getIndex());
+          constituent.setLeftSib(prev);
+          constituent.setRightSib(Document.NONE);
+
+          doc.getConstituent(prev).setRightSib(constituent.getIndex());
+
+          // Update bounds of entire situation
+          assert constituent.getFirstToken() >= 0;
+          if (constituent.getFirstToken() < firstT)
+            firstT = constituent.getFirstToken();
+          assert constituent.getLastToken() >= 0;
+          if (constituent.getLastToken() > lastT)
+            lastT = constituent.getLastToken();
+
+          if (debug) {
+            Log.info("setting arg, role=" + arg.getRole()
+                + " first=" + constituent.getFirstToken()
+                + " last=" + constituent.getLastToken()
+                + " leftChild=" + constituent.getLeftChild()
+                + " rightChild=" + constituent.getRightChild());
+          }
+
+          // Update right child of situation
+          sit.setRightChild(constituent.getIndex());
+
+          prev = constituent.forwards();
+        }
+
+        // Set the first and last token for the entire situation
+        sit.setFirstToken(firstT);
+        sit.setLastToken(lastT);
+
+        if (debug) {
+          Log.info("sit.firstToken=" + sit.getFirstToken()
+              + " sit.lastToken=" + sit.getLastToken()
+              + " numArgs=" + numArgs);
+        }
+      }
+    }
+    return first;
+  }
+
   /**
    * Convert a {@link Communication} into a {@link Document}.
-   * @param mapping may be null
    */
   public ConcreteDocumentMapping communication2Document(
       Communication c, int docIndex, MultiAlphabet alph) {
@@ -448,128 +584,26 @@ public class ConcreteIO {
 
     // Add Propbank SRL
     if (this.propbankSrlToolName != null) {
-      SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), propbankSrlToolName);
-      if (sms == null) {
-        System.err.println("failed to find Propbank SRL: " + propbankSrlToolName);
-      } else {
-        // What if there are no situations?
-        doc.cons_propbank_gold = constituent.getIndex();
-        constituent.setParent(Document.NONE);
-        constituent.setOnlyChild(Document.NONE);
-        constituent.setLhs(alph.srl("EMPTY-SRL"));
-        constituent.setFirstToken(Document.NONE);
-        constituent.setLastToken(Document.NONE);
-        int prevSit = Document.NONE;
-        for (SituationMention sm : sms.getMentionList()) {
-
-          // Make a situation node which is the parent of all the pred/args
-          Constituent sit = constituent.forwardsC();
-          sit.setLhs(alph.srl("propbank"));
-          sit.setLeftSib(prevSit);
-          sit.setRightSib(Document.NONE); // will be over-written
-          sit.setParent(Document.NONE);
-          if (prevSit != Document.NONE)
-            doc.getConstituent(prevSit).setRightSib(sit.getIndex());
-          prevSit = sit.getIndex();
-
-          // Constituent index of previous pred/arg
-          int prev = Document.NONE;
-
-          // Set the predicate
-          // first/last tokens + left/right children
-          setupConstituent(sm.getConstituent(), sm.getTokens(), constituent,
-              constituentIndices, mapping, doc);
-          // Everything else
-          constituent.setLhs(alph.srl(sm.getSituationKind()));
-          constituent.setParent(sit.getIndex());
-          constituent.setLeftSib(Document.NONE);
-          constituent.setRightSib(Document.NONE);
-
-          // Set sit -> pred
-          sit.setLeftChild(constituent.getIndex());
-          sit.setRightChild(constituent.getIndex());
-          if (debug) {
-            Log.info("adding Situation text=\"" + sm.getText()
-                + "\" first=" + constituent.getFirstToken()
-                + " last=" + constituent.getLastToken());
-          }
-
-          // Set the parent links (verb token -> propbank cons node)
-          assert constituent.getFirstToken() >= 0;
-          assert constituent.getLastToken() >= 0;
-          int[] parents = doc.getConsParent(ConstituentType.PROPBANK_GOLD);
-          for (int tokI = constituent.getFirstToken(); tokI <= constituent.getLastToken(); tokI++) {
-            parents[tokI] = constituent.getIndex();
-          }
-
-          if (debug) {
-            Log.info("pred.firstToken=" + constituent.getFirstToken()
-                + " pred.lastToken=" + constituent.getLastToken());
-          }
-
-          // Store the bounds of the entire situation
-          int firstT = constituent.getFirstToken();
-          int lastT = constituent.getLastToken();
-
-          prev = constituent.forwards();
-
-          // Set the arguments
-          int numArgs = sm.getArgumentListSize();
-          for (int ai = 0; ai < numArgs; ai++) {
-            MentionArgument arg = sm.getArgumentList().get(ai);
-            // first/last tokens + left/right children
-            setupConstituent(arg.getConstituent(), arg.getTokens(), constituent,
-                constituentIndices, mapping, doc);
-            // Everything else
-            constituent.setLhs(alph.srl(arg.getRole()));
-            constituent.setParent(sit.getIndex());
-            constituent.setLeftSib(prev);
-            constituent.setRightSib(Document.NONE);
-
-            doc.getConstituent(prev).setRightSib(constituent.getIndex());
-
-            // Update bounds of entire situation
-            assert constituent.getFirstToken() >= 0;
-            if (constituent.getFirstToken() < firstT)
-              firstT = constituent.getFirstToken();
-            assert constituent.getLastToken() >= 0;
-            if (constituent.getLastToken() > lastT)
-              lastT = constituent.getLastToken();
-
-            if (debug) {
-              Log.info("setting arg, role=" + arg.getRole()
-                  + " first=" + constituent.getFirstToken()
-                  + " last=" + constituent.getLastToken()
-                  + " leftChild=" + constituent.getLeftChild()
-                  + " rightChild=" + constituent.getRightChild());
-            }
-
-            // Update right child of situation
-            sit.setRightChild(constituent.getIndex());
-
-            prev = constituent.forwards();
-          }
-
-          // Set the first and last token for the entire situation
-          sit.setFirstToken(firstT);
-          sit.setLastToken(lastT);
-
-          if (debug) {
-            Log.info("sit.firstToken=" + sit.getFirstToken()
-                + " sit.lastToken=" + sit.getLastToken()
-                + " numArgs=" + numArgs);
-          }
-        }
-      }
+      Constituent propbankSrl = addPropbankSrl(c, this.propbankSrlToolName,
+          constituentIndices, mapping, constituent, alph);
+      if (propbankSrl == null)
+        Log.warn("Failed to get Propbank SRL");
+      else
+        doc.cons_propbank_gold = propbankSrl.getIndex();
     }
 
     // Add coref
     if (entitySetToolName != null) {
+      Log.info("adding EntityMentionSet: " + entitySetToolName);
       EntitySet es = findByTool(c.getEntitySetList(), entitySetToolName);
       if (!es.isSetMentionSetId())
-        throw new RuntimeException("implement EntityMentionSet finder");
+        throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
       EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
-      addCorefConstituents(es, ems, constituent, mapping, alph);
+      Constituent coref = addCorefConstituents(es, ems, constituent, mapping, alph);
+      if (coref == null)
+        throw new RuntimeException("emtpy EntitySet? " + es.getUuid());
+      else
+        doc.cons_coref_gold = coref.getIndex();
     }
 
     // Compute BrownClusters
@@ -640,7 +674,7 @@ public class ConcreteIO {
     return max;
   }
 
-  public static ConcreteIO makeInstance(Language lang) {
+  public static ConcreteToDocument makeInstance(Language lang) {
     IRAMDictionary wnDict = null;
     BrownClusters bc256 = null;
     BrownClusters bc1000 = null;
@@ -659,7 +693,7 @@ public class ConcreteIO {
         throw new RuntimeException(e);
       }
     }
-    ConcreteIO io = new ConcreteIO(bc256, bc1000, wnDict, lang);
+    ConcreteToDocument io = new ConcreteToDocument(bc256, bc1000, wnDict, lang);
     return io;
   }
 
@@ -667,19 +701,29 @@ public class ConcreteIO {
     T match = null;
     List<UUID> possible = new ArrayList<>();
     for (T t : items) {
+
+      UUID am;
       try {
-        Method m = t.getClass().getMethod("getId");
-        UUID am = (UUID) m.invoke(t);
-        possible.add(am);
-        if (id.equals(am)) {
-          if (match != null) {
-            throw new RuntimeException("non-unique UUID \""
-                + id + "\" in " + possible);
+        am = (UUID) t.getClass().getMethod("getId").invoke(t);
+      } catch (Exception nsm1) {
+        try {
+          am = (UUID) t.getClass().getMethod("getUuid").invoke(t);
+        } catch (Exception nsm2) {
+          try {
+            am = (UUID) t.getClass().getMethod("getUUID").invoke(t);
+          } catch (Exception nsm3) {
+            throw new RuntimeException("couldn't figure out id for: " + t);
           }
-          match = t;
         }
-      } catch (Exception e) {
-        throw new RuntimeException(e);
+      }
+
+      possible.add(am);
+      if (id.equals(am)) {
+        if (match != null) {
+          throw new RuntimeException("non-unique UUID \""
+              + id + "\" in " + possible);
+        }
+        match = t;
       }
     }
     if (match == null) {

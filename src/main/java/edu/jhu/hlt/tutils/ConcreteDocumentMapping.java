@@ -35,6 +35,8 @@ public class ConcreteDocumentMapping {
   // in tutils.Document, e.g. EntityMention, Entity, Tokenization, Section, etc
   private BiMap<Document.Constituent, UUID> items;
 
+  // TODO add Map<UUID, Class> types; ?
+
   // An interesting one is Tokenization vs Sentence.
   // If I had my druthers they'd be combined (as they are in tutils.Document)
   // and if this is to be a bimap I can't have a Tokenization.UUID and a

@@ -22,7 +22,7 @@ public class PropbankIngestionTest {
 //    }
     System.out.println("setting up");
     //ConcreteIO cio = ConcreteIO.makeInstance();
-    ConcreteIO cio = new ConcreteIO(null, null, null, Language.EN);
+    ConcreteToDocument cio = new ConcreteToDocument(null, null, null, Language.EN);
     cio.setConstituencyParseToolname("ontonotes4");
     cio.setPropbankToolname("ontonotes4");
     cio.setPosToolName("ontonotes4-pos");
