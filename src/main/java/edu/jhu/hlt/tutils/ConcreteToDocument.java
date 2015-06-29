@@ -594,7 +594,8 @@ public class ConcreteToDocument {
 
     // Add coref
     if (entitySetToolName != null) {
-      Log.info("adding EntityMentionSet: " + entitySetToolName);
+      if (debug)
+        Log.info("adding EntityMentionSet: " + entitySetToolName);
       EntitySet es = findByTool(c.getEntitySetList(), entitySetToolName);
       if (!es.isSetMentionSetId())
         throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
