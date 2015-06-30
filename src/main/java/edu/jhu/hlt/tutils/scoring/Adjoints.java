@@ -15,8 +15,15 @@ public interface Adjoints {
   /** Compute the score of this expression from all of its dependents */
   public double forwards();
 
-  /** Update any parameters which are dependents in this expression graph */
+  /**
+   * Update any parameters which are dependents in this expression graph.
+   *
+   * NOTE: This method MAY NOT DEPEND ON the current value of the parameters!
+   * If we produce N Adjoints when a training example is observed, any
+   * permutation of those N adjoints should yield the same parameter values.
+   */
   public void backwards(double dErr_dForwards);
+
 
   /** Adjoints representing a value which cannot be updated with backwards */
   public static class Constant implements Adjoints {
