@@ -75,6 +75,10 @@ public class Timer {
 
   public String toString() {
     double spc = secPerCall();
+    if (spc < 0.001) {
+      return String.format("<Timer %s %.2f sec and %d calls total, %.3f ms/call>",
+          id, totalTimeInSeconds(), count, spc * 1000);
+    }
     return String.format("<Timer %s %.2f sec and %d calls total, %.3f sec/call>",
         id, totalTimeInSeconds(), count, spc);
   }
