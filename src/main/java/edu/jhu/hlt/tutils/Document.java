@@ -1,11 +1,9 @@
 package edu.jhu.hlt.tutils;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -426,11 +424,20 @@ public final class Document implements Serializable {
     public abstract int getStart();
     public abstract int getWidth();
 
-    public List<Token> getTokens() {
-      List<Token> tokens = new ArrayList<>();
+    public int[] getWords() {
       int width = getWidth();
+      int[] words = new int[width];
+      int s = getStart();
       for (int w = 0; w < width; w++)
-        tokens.add(getToken(w));
+        words[w] = Document.this.getWord(s + w);
+      return words;
+    }
+
+    public Token[] getTokens() {
+      int width = getWidth();
+      Token[] tokens = new Token[width];
+      for (int w = 0; w < width; w++)
+        tokens[w] = getToken(w);
       return tokens;
     }
 
@@ -472,6 +479,8 @@ public final class Document implements Serializable {
   public class Slice extends AbstractSlice {
     private int start, width;
     public Slice(int start, int width) {
+      if (width <= 0)
+        throw new IllegalArgumentException("width=" + width);
       this.start = start;
       this.width = width;
     }
@@ -487,8 +496,14 @@ public final class Document implements Serializable {
       return width;
     }
   }
-  public Slice slice(int start, int width) {
+  /** Slice with [W]idth */
+  public Slice sliceW(int start, int width) {
     return this.new Slice(start, width);
+  }
+  /** Slice with [L]ast */
+  public Slice sliceL(int first, int last) {
+    int width = (last - first) + 1;
+    return this.new Slice(first, width);
   }
 
   // Pointer to a token
