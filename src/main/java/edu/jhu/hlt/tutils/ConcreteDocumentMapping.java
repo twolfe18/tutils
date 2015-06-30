@@ -80,6 +80,15 @@ public class ConcreteDocumentMapping {
     return communication;
   }
 
+  public void dropCommunicationInFavorOfId() {
+    if (communication == null) {
+      Log.warn("communication was already null!");
+      return;
+    }
+    communicationUUID = communication.getUuid();
+    communication = null;
+  }
+
   public Document getDocument() {
     return doc;
   }
