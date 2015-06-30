@@ -230,16 +230,14 @@ public final class Document implements Serializable {
    */
   public Map<IntPair, Integer> getSpanToConstituentMapping(int firstConsIdx) {
     Map<IntPair, Integer> cons = new HashMap<>();
-    for (ConstituentItr ci = getConstituentItr(firstConsIdx); ci.isValid(); ci.gotoRightSib()) {
-      if (ci.getLeftChild() != ci.getRightChild())
-        Log.warn("cparses should have one root: cons=" + ci.getIndex() + " doc=" + id);
+    for (ConstituentItr ci = getConstituentItr(firstConsIdx); ci.isValid(); ci.gotoRightSib())
       for (ConstituentItr root = getConstituentItr(ci.getLeftChild()); root.isValid(); root.gotoRightSib())
         addCparseSpans(cons, root);
-    }
     return cons;
   }
   /** Keeps the shallowest (closest to root) span if they're not all unique */
   private static void addCparseSpans(Map<IntPair, Integer> m, Constituent c) {
+    // Add this span
     int f = c.getFirstToken();
     int l = c.getLastToken();
     if (f < 0 || l < 0 || l < f)
@@ -251,6 +249,12 @@ public final class Document implements Serializable {
       int oldDepth = c.getDocument().getConstituent(old).getDepth();
       assert c.getDepth() < 0 || oldDepth < 0 || oldDepth < c.getDepth();
       m.put(k, old);  // put back the old (shallower) constituent)
+    }
+    // Recurse
+    Document doc = c.getDocument();
+    for (ConstituentItr child = doc.getConstituentItr(c.getLeftChild());
+        child.isValid(); child.gotoRightSib()) {
+      addCparseSpans(m, child);
     }
   }
 
