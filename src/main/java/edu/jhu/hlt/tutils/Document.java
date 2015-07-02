@@ -3,16 +3,18 @@ package edu.jhu.hlt.tutils;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 /**
  * More or less the CoNLL format in memory, with some other influences which
  * keep things very tabular.
  *
- * TODO keep a `top` pointer for the next available constituent and token. This
- * is useful so that you don't need to carry around a single ConstituentItr to
- * any place you might want to add a constituent to.
+ * TODO Dependency parses can be done like constituency parses instead of
+ * needing another full array for every type of dependency parse. The cost is
+ * that you need another int[] for token (that that label applies to). The
+ * benefit is that if you have unparsed sentences or many types of dependency
+ * parsers (and only a few will ever be populated at a given time), then you
+ * don't need to waste space on them.
  *
  * TODO figure out a scheme by which we can de-allocate some of these token
  * indexed fields (e.g. checking if all the values are -2, then set to null).
@@ -31,6 +33,7 @@ public final class Document implements Serializable {
   final String id;
   int index;
   private transient MultiAlphabet alph;
+
 
   /* GRAPHS *******************************************************************/
   // A note on graphs:
@@ -55,7 +58,14 @@ public final class Document implements Serializable {
   // See http://universaldependencies.github.io/docs/u/overview/syntax.html
   LabeledDirectedGraph universalDependencies;
 
+
+  /* MEMORY BOOK-KEEPING ******************************************************/
+  int tokTop = 0;     // index of first un-used token
+  int consTop = 0;    // index of first un-used constituent
+
+
   /* TOKEN-INDEXED FIELDS *****************************************************/
+
   int[] word;
   int[] wordNocase;
   int[] pos;
@@ -77,12 +87,9 @@ public final class Document implements Serializable {
   int[] dep_parent;   // value is a token index
   int[] dep_label;    // value is an edge/label type
 
-  // Constituency parse info: value is constituent index of the deepest
-  // constituent which dominates this token.
-  // NOTE: Note about multiple dependency parses is true here too: will need to
-  // add another index which ranges over parses. Constituent class will add this
-  // as another index.
-//  int[] cons_parent;
+
+  /* Pointers from token -> leaf constituent **********************************/
+  // TODO Think about whether these should be kept at all.
 
   // The index of a constituency tree node immediately dominated by this token.
   // May be -1 for constituency trees that don't cover the entire span.
@@ -149,14 +156,10 @@ public final class Document implements Serializable {
   }
 
 
-  // AHHHH!!!
-  // breaks is not necessary and clumsy!
-  // Use constituents instead!
-  // space used by breaks = sizeof(int) * #tokens
-  // space used by constituents = sizeof(int) * 9 * #sentences
-  //      (with reconstruction) = sizeof(int) * 5 * #sentences
-  // TODO once this is setup, then I can get rid of the parent stuff
-  public int cons_sentences = NONE;  // index of constituent corresponding to the first sentence
+  /* LINKED LIST OF CONSTITUENTS **********************************************/
+
+  // index of constituent corresponding to the first sentence
+  public int cons_sentences = NONE;
   public int cons_paragraph = NONE;
   public int cons_section = NONE;
 
@@ -165,6 +168,7 @@ public final class Document implements Serializable {
   public int cons_ptb_auto = NONE;
 
   // top level is linked list of items like (PROP ... (ARG ...) (ARG ...) ...)
+  // See above for note about handling Propbank continuation roles, etc.
   public int cons_propbank_gold = NONE;
   public int cons_propbank_auto = NONE;
 
@@ -182,8 +186,8 @@ public final class Document implements Serializable {
   public int cons_coref_gold = NONE;
   public int cons_coref_auto = NONE;
 
-  // First tokens of paragraphs and sentences
-  int[] breaks;
+  /* END OF LINKED LIST OF CONSTITUENTS ***************************************/
+
 
   /* CONSTITUENT-INDEXED FIELDS ***********************************************/
   int[] lhs;          // left hand side of a CFG rule, e.g. "NP" or "SBAR", NOT a POS tag (that would mean 1 Constituent per word, we want to stay one level higher than that)
@@ -201,7 +205,7 @@ public final class Document implements Serializable {
   int[] depth;
 
 
-  // TODO The working plan for {@link Situation}s and {@link Entity}s is to put
+  // The working plan for {@link Situation}s and {@link Entity}s is to put
   // them in as constituency trees. See the description of how Propbank is
   // encoded for an example of how this can work. The only issue that may come
   // up is how to fit all of the needed information into `lhs`. Maybe adding
@@ -257,6 +261,7 @@ public final class Document implements Serializable {
   }
 
   /* END OF CONVENIENCE METHODS ***********************************************/
+
 
   public Document(String id, int index, MultiAlphabet alph) {
     this.id = id;
@@ -320,7 +325,6 @@ public final class Document implements Serializable {
   public int getSense(int tokenIndex) { return sense[tokenIndex]; }
   public int getDepParent(int tokenIndex) { return dep_parent[tokenIndex]; }
   public int getDepLabel(int tokenIndex) { return dep_label[tokenIndex]; }
-  public int getBreak(int tokenIndex) { return breaks[tokenIndex]; }
 
   public int getConstituentParentIndex(int tokenIndex, ConstituentType consType) {
     return getConsParent(consType)[tokenIndex];
@@ -371,9 +375,9 @@ public final class Document implements Serializable {
     shape = copy(shape, numTokens, UNINITIALIZED);
     ner = copy(ner, numTokens, UNINITIALIZED);
     sense = copy(sense, numTokens, UNINITIALIZED);
+
     dep_parent = copy(dep_parent, numTokens, UNINITIALIZED);
     dep_label = copy(dep_label, numTokens, UNINITIALIZED);
-    breaks = copy(breaks, numTokens, UNINITIALIZED);
 
     cons_parent_ptb_gold = copy(cons_parent_ptb_gold, numTokens, UNINITIALIZED);
     cons_parent_ptb_auto = copy(cons_parent_ptb_auto, numTokens, UNINITIALIZED);
@@ -418,7 +422,8 @@ public final class Document implements Serializable {
     return out;
   }
 
-  // Ways to slice up a document
+
+  /** Ways to slice up a document */
   public abstract class AbstractSlice implements MultiAlphabet.Showable {
 
     public abstract int getStart();
@@ -476,6 +481,9 @@ public final class Document implements Serializable {
       return Document.this;
     }
   }
+
+
+  /** Concrete implementation based on int start, width */
   public class Slice extends AbstractSlice {
     private int start, width;
     public Slice(int start, int width) {
@@ -506,7 +514,8 @@ public final class Document implements Serializable {
     return this.new Slice(first, width);
   }
 
-  // Pointer to a token
+
+  /** Pointer to a token */
   public class Token extends Slice {
     protected int index;
     public Token(int index) {
@@ -516,7 +525,7 @@ public final class Document implements Serializable {
       this.index = index;
     }
 
-    /** Use sparingly */
+    /** Use sparingly: Not always obvious which alph sub-section to use. */
     public String getWordStr() { return alph.word(word[index]); }
     public String getPosStr() { return alph.pos(pos[index]); }
 
@@ -533,20 +542,12 @@ public final class Document implements Serializable {
     public int getSense() { return sense[index]; }
     public int getDepParent() { return dep_parent[index]; }
     public int getDepLabel() { return dep_label[index]; }
-    public int getBreak() { return breaks[index]; }
 
     public int getConstituentParentIndex(ConstituentType consType) {
       return Document.this.getConstituentParentIndex(index, consType);
     }
     public Constituent getConstituentParent(ConstituentType consType) {
       return Document.this.getConstituentParent(index, consType);
-    }
-
-    public boolean startsSentence() {
-      return breaks[index] >= Sentence.BREAK_LEVEL;
-    }
-    public boolean startsParagraph() {
-      return breaks[index] >= Paragraph.BREAK_LEVEL;
     }
 
     public void setConstituentParent(int x, ConstituentType consType) {
@@ -566,11 +567,6 @@ public final class Document implements Serializable {
     public void setDepParent(int x) { dep_parent[index] = x; }
     public void setDepLabel(int x) { dep_label[index] = x; }
 
-    public void setBreak(int x) { breaks[index] = x; }
-    public void setBreakSafe(int x) {
-      if (x > breaks[index])
-        breaks[index] = x;
-    }
     @Override
     public String show(MultiAlphabet alph) {
       String w = alph.word(getWord());
@@ -582,80 +578,49 @@ public final class Document implements Serializable {
     return this.new Token(i);
   }
 
-  // For using Token like an iterator (be careful!)
+
+  /** For using Token like an iterator (be careful!) */
   public class TokenItr extends Token {
-    private int sentence = -2;
-    private int paragraph = -2;
+    private boolean allowExpansion = true;
 
     public TokenItr(int index) {
       super(index);
     }
 
     public boolean isValid() {
-      return index < word.length;
+      return index >= 0 && index < tokTop;
     }
 
-    public void forwards() {
+    public int forwards() {
+      int old = index;
       index++;
-      update(1);
-    }
-    public void backwards() {
-      index--;
-      update(-1);
-    }
-
-    public void setIndex(int tokenIndex) {
-      this.index = tokenIndex;
-      this.sentence = -2;
-      this.paragraph = -2;
-    }
-
-    private void update(int delta) {
-      if (!isValid())
-        return;
-      if (sentence >= -1 && startsSentence())
-        sentence += delta;
-      if (paragraph >= -1 && startsParagraph())
-        paragraph += delta;
-    }
-    private void updateFromStart() {
-      int idx = index;
-      index = -1;
-      sentence = -1;
-      paragraph = -1;
-      while (index < idx) {
-        index++;
-        update(1);
+      tokTop++;
+      if (allowExpansion && index >= word.length) {
+        double rate = 1.6;
+        int newSize = (int) (rate * word.length + 1);
+        Document.this.reserveTokens(newSize);
       }
+      return old;
     }
 
-    /**
-     * Will return n-1 where n is the number of sentence breaks seen between the
-     * start of the document and this index, inclusive. This means -1 if there
-     * are no sentence breaks, 0 if this is the first sentence, etc.
-     */
-    public int getSentence() {
-      if (sentence < -1)
-        updateFromStart();
-      return sentence;
+    public int backwards() {
+      int old = index;
+      index--;
+      return old;
     }
 
-    /**
-     * Will return n-1 where n is the number of paragraph breaks seen between the
-     * start of the document and this index, inclusive. This means -1 if there
-     * are no paragraph breaks, 0 if this is the first paragraph, etc.
-     */
-    public int getParagraph() {
-      if (paragraph < -1)
-        updateFromStart();
-      return paragraph;
+    public int gotoToken(int tokenIndex) {
+      int old = index;
+      this.index = tokenIndex;
+      return old;
     }
   }
   public TokenItr getTokenItr(int i) {
     return this.new TokenItr(i);
   }
 
-  // Pointer to a constituent
+
+  /** Pointer to a constituent */
   public class Constituent extends AbstractSlice {
     protected int index;
     // NOTE: When this module is expanded to allow multiple constituency parses,
@@ -690,9 +655,6 @@ public final class Document implements Serializable {
     }
     public String showSubtree(MultiAlphabet alph) {
       ConstituentItr ci = new ConstituentItr(getIndex());
-
-      //String lhs = alph.cfg(ci.getLhs());
-      //Log.info("ci=" + lhs);
 
       /*
        * The problem is that not all children may be a mix of terminals and non-terminals!
@@ -751,15 +713,6 @@ public final class Document implements Serializable {
       return leftChild[index] < 0;
     }
 
-    // NOTE: If `lhs` may be used for more than one thing: then don't allow
-    // this type of method!
-//    public String getLhsStr() {
-//      int cfg = lhs[index];
-//      if (cfg < 0)
-//        return "???";
-//      return alph.cfg(cfg);
-//    }
-
     public int getParent() { return parent[index]; }
     public int getLeftChild() { return leftChild[index]; }
     public int getRightSib() { return rightSib[index]; }
@@ -797,9 +750,8 @@ public final class Document implements Serializable {
     return this.new Constituent(c);
   }
 
-  /**
-   * A class for traversing and adding constituents.
-   */
+
+  /** A class for traversing and adding constituents. */
   public class ConstituentItr extends Constituent {
     // Whether the forwards method should allow constituent fields to be re-allocated
     private boolean allowExpansion;
@@ -821,6 +773,7 @@ public final class Document implements Serializable {
     public int forwards() {
       int old = index;
       index++;
+      consTop++;
       if (allowExpansion && index >= lhs.length) {
         double rate = 1.6;
         int newSize = (int) (rate * lhs.length + 1);
@@ -846,7 +799,9 @@ public final class Document implements Serializable {
       return Document.this.getConstituent(backwards());
     }
 
-    public boolean isValid() { return index >= 0; }
+    public boolean isValid() {
+      return index >= 0 && index < consTop;
+    }
 
     /** Returns the constituent index before the update is applied */
     public int gotoParent() {
@@ -884,6 +839,7 @@ public final class Document implements Serializable {
     return this.new ConstituentItr(c);
   }
 
+
   public class Sentence extends Slice {
     public static final int BREAK_LEVEL = 1;
     public final int breakLevel = BREAK_LEVEL;
@@ -891,6 +847,7 @@ public final class Document implements Serializable {
       super(start, length);
     }
   }
+
 
   public class Paragraph extends Slice {
     public static final int BREAK_LEVEL = 2;
@@ -900,29 +857,4 @@ public final class Document implements Serializable {
     }
   }
 
-  public Iterator<Sentence> getSentences() {
-    return this.new SentenceItr();
-  }
-  public class SentenceItr implements Iterator<Sentence> {
-    // Index into breaks corresponding to the start of a sentence.
-    // If there are no remaining sentences it will be -1.
-    private int next = 0;
-    @Override
-    public boolean hasNext() {
-      return next >= 0;
-    }
-    @Override
-    public Sentence next() {
-      int r = next;
-      int length = 0;
-      for (int i = next + 1; i < breaks.length; i++) {
-        length++;
-        if (breaks[i] >= Sentence.BREAK_LEVEL) {
-          next = i;
-          break;
-        }
-      }
-      return Document.this.new Sentence(r, length);
-    }
-  }
 }

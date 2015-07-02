@@ -520,9 +520,7 @@ public class ConcreteToDocument {
     Map<ConstituentRef, Integer> constituentIndices = new HashMap<>();
     int prevParse = Document.NONE;
     for (Section s : c.getSectionList()) {
-      token.setBreakSafe(Document.Paragraph.BREAK_LEVEL);
       for (Sentence ss : s.getSentenceList()) {
-        token.setBreakSafe(Document.Sentence.BREAK_LEVEL);
 
         int tokenOffset = token.getIndex();
         if (debug) Log.info("tokenOffset=" + tokenOffset);
