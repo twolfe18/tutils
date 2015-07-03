@@ -286,11 +286,11 @@ public final class Document implements Serializable {
   }
 
   public int numTokens() {
-    return word.length;
+    return tokTop;
   }
 
   public int numConstituents() {
-    return lhs.length;
+    return consTop;
   }
 
   /**
@@ -577,6 +577,12 @@ public final class Document implements Serializable {
   public Token getToken(int i) {
     return this.new Token(i);
   }
+  public Token newToken() {
+    return this.new Token(tokTop++);
+  }
+  public TokenItr newTokenItr() {
+    return this.new TokenItr(tokTop++);
+  }
 
 
   /** For using Token like an iterator (be careful!) */
@@ -748,6 +754,12 @@ public final class Document implements Serializable {
   }
   public Constituent getConstituent(int c) {
     return this.new Constituent(c);
+  }
+  public Constituent newConstituent() {
+    return this.new Constituent(consTop++);
+  }
+  public ConstituentItr newConstituentItr() {
+    return this.new ConstituentItr(consTop++);
   }
 
 
