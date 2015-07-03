@@ -17,8 +17,9 @@ public class IntTrip {
     return hash;
   }
 
+  @Override
   public boolean equals(Object other) {
-    if (other instanceof IntPair) {
+    if (other instanceof IntTrip) {
       IntTrip x = (IntTrip) other;
       return first == x.first && second == x.second && third == x.third;
     }
