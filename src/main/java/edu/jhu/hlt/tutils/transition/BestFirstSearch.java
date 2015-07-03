@@ -4,6 +4,8 @@ import java.util.Iterator;
 
 import edu.jhu.hlt.tutils.Beam;
 import edu.jhu.hlt.tutils.Log;
+import edu.jhu.hlt.tutils.OrderStatistics;
+import edu.jhu.hlt.tutils.Timer;
 import edu.jhu.hlt.tutils.scoring.Adjoints;
 import edu.jhu.hlt.tutils.scoring.LossAugmentedParams;
 import edu.jhu.hlt.tutils.scoring.Params;
@@ -24,6 +26,7 @@ public class BestFirstSearch<S, A> implements Runnable {
     public final S state;
     public final Adjoints score;        // partial score
     public final ScoredState<S> prev;
+
     public ScoredState(S state, Adjoints score, ScoredState<S> prev) {
       this.state = state;
       this.score = score;
@@ -48,12 +51,34 @@ public class BestFirstSearch<S, A> implements Runnable {
     }
   }
 
+  public static class SearchStats {
+    public int pushes = 0;
+    public int pops = 0;
+    public OrderStatistics<Integer> branchingFactors = new OrderStatistics<>();
+    public Timer runTimer = new Timer("run", 1, false);
+    @Override
+    public String toString() {
+      String sep = " ";
+      StringBuilder sb = new StringBuilder("(SearchStats");
+      sb.append(sep);
+      sb.append("pushes=" + pushes);
+      sb.append(sep);
+      sb.append("pops=" + pops);
+      sb.append(sep);
+      sb.append("branchingFactors=" + branchingFactors);
+      sb.append(')');
+      return sb.toString();
+    }
+  }
+
   private TransitionFunction<S, A> transitionFunc;
   private S initialState;
   private Params<S, A> model;
   private Beam<ScoredState<S>> maxBeam;
   private int beamSize;
   public boolean debug = false;
+
+  public SearchStats stats;
 
   public int mode = 2;
 
@@ -69,16 +94,19 @@ public class BestFirstSearch<S, A> implements Runnable {
     this.initialState = initialState;
     this.beamSize = beamSize;
     this.maxBeam = Beam.getMostEfficientImpl(1);
+    this.stats = new SearchStats();
   }
 
   public void run2() {
 
+    stats.runTimer.start();
     if (debug)
       Log.info("starting with model=" + model);
 
     Beam<ScoredState<S>> frontier = Beam.getMostEfficientImpl(beamSize);
     Adjoints score0 = Adjoints.Constant.ZERO;
     frontier.push(new ScoredState<>(initialState, score0, null), score0.forwards());
+    stats.pushes++;
     while (frontier.size() > 0) {
 
       Beam<ScoredState<S>> newFrontier = Beam.getMostEfficientImpl(beamSize);
@@ -86,9 +114,12 @@ public class BestFirstSearch<S, A> implements Runnable {
       Beam.Item<ScoredState<S>> bestItem = frontier.popItem();
       ScoredState<S> best = bestItem.getItem();
       double scoreSoFar = bestItem.getScore();
+      stats.pops++;
 
+      int branch = 0;
       Iterator<A> actionItr = transitionFunc.next(best.state);
       while (actionItr.hasNext()) {
+        branch++;
         A action = actionItr.next();
         Adjoints partial = model.score(best.state, action);
         double fullScore = scoreSoFar + partial.forwards();
@@ -98,8 +129,10 @@ public class BestFirstSearch<S, A> implements Runnable {
         if (fullScore > newFrontier.minScore()) {
           S next = transitionFunc.apply(best.state, action);
           newFrontier.push(new ScoredState<>(next, partial, best), fullScore);
+          stats.pushes++;
         }
       }
+      stats.branchingFactors.add(branch);
 
       if (debug)
         Log.info("done iter, frontier.size=" + frontier.size() + " newFrontier.size=" + newFrontier.size());
@@ -110,13 +143,16 @@ public class BestFirstSearch<S, A> implements Runnable {
         frontier = newFrontier;
     }
     if (debug) {
+      Log.info(stats.toString());
       Log.info("returning with maxBeam.peek=" + maxBeam.peek());
     }
+    stats.runTimer.stop();
   }
 
   @Override
   public void run() {
-    Log.info("mode=" + mode);
+    if (debug)
+      Log.info("mode=" + mode);
     switch (mode) {
       case 1:
         run1();

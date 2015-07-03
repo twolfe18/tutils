@@ -20,6 +20,7 @@ public class IntPair {
     return hash;
   }
 
+  @Override
   public boolean equals(Object other) {
     if (other instanceof IntPair) {
       IntPair x = (IntPair) other;

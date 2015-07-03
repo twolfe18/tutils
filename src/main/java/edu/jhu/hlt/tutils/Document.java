@@ -22,6 +22,9 @@ import java.util.Map;
  * TODO Add dependency graphs for collapsed dependency representations.
  * @see edu.jhu.hlt.tutils.LabeledDirectedGraph
  *
+ * NOTE: Ha! I could decide to go fully crazy and implement a memory allocator
+ * in Document: have a free list for tokens and constituents.
+ *
  * @author travis
  */
 public final class Document implements Serializable {
@@ -267,6 +270,11 @@ public final class Document implements Serializable {
     this.id = id;
     this.index = index;
     this.alph = alph;
+  }
+
+  /** May be slow: uses java serialization (for safety) */
+  public Document copy() {
+    return SerializationUtils.cloneViaSerialization(this);
   }
 
   public String getId() {

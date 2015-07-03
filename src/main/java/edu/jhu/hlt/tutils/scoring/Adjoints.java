@@ -91,6 +91,10 @@ public interface Adjoints {
 //    private boolean computedCache = false;
 
     public Linear(IntDoubleVector theta, IntDoubleVector features) {
+      if (theta == null)
+        throw new IllegalArgumentException("theta cannot be null");
+      if (features == null)
+        throw new IllegalArgumentException("features cannot be null");
       this.theta = theta;
       this.features = features;
     }

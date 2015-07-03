@@ -36,4 +36,10 @@ public class SerializationUtils {
       throw new RuntimeException(e);
     }
   }
+
+  public static <T extends Serializable> T cloneViaSerialization(T t) {
+    byte[] b = t2bytes(t);
+    T copy = bytes2t(b);
+    return copy;
+  }
 }
