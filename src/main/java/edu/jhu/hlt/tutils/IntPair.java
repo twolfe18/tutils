@@ -1,5 +1,7 @@
 package edu.jhu.hlt.tutils;
 
+import java.util.Comparator;
+
 /**
  * Immutable.
  * @author travis
@@ -33,4 +35,25 @@ public class IntPair {
   public String toString() {
     return "(" + first + ", " + second + ")";
   }
+
+  public static Comparator<IntPair> ASCENDING = new Comparator<IntPair>() {
+    @Override
+    public int compare(IntPair o1, IntPair o2) {
+      if (o1.first < o2.first)
+        return -1;
+      if (o1.first > o2.first)
+        return 1;
+      if (o1.second < o2.second)
+        return -1;
+      if (o1.second > o2.second)
+        return 1;
+      return 0;
+    }
+  };
+  public static Comparator<IntPair> DESCENDING = new Comparator<IntPair>() {
+    @Override
+    public int compare(IntPair o1, IntPair o2) {
+      return -ASCENDING.compare(o1, o2);
+    }
+  };
 }
