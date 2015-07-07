@@ -2,8 +2,10 @@ package edu.jhu.hlt.tutils;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.ToIntFunction;
 
 /**
  * More or less the CoNLL format in memory, with some other influences which
@@ -29,14 +31,18 @@ import java.util.Map;
  */
 public final class Document implements Serializable {
   private static final long serialVersionUID = 1L;
-  public static final int NONE = -1;
+  public static final int NONE = -1;    // terminator for linked lists (NIL)
   public static final int UNINITIALIZED = -2;
+
+  public static boolean LOG_ALLOCATIONS = false;
 
   /* GENERAL FIELDS ***********************************************************/
   final String id;
   int index;
   private transient MultiAlphabet alph;
 
+  // Whether the forwards method should allow constituent fields to be re-allocated
+  private boolean allowExpansion = true;
 
   /* GRAPHS *******************************************************************/
   // A note on graphs:
@@ -159,7 +165,7 @@ public final class Document implements Serializable {
   }
 
 
-  /* LINKED LIST OF CONSTITUENTS **********************************************/
+  /* LINKED LISTS OF CONSTITUENTS *********************************************/
 
   // index of constituent corresponding to the first sentence
   public int cons_sentences = NONE;
@@ -263,6 +269,21 @@ public final class Document implements Serializable {
     }
   }
 
+  /**
+   * Traverses a linked list of constituents (using gotoRightSib()) and extracts
+   * the result of the provided function.
+   * @param consIdx is the index of the first constituent.
+   * @param f extracts a value from a {@link Constituent}
+   */
+  public BitSet extractAllConstituents(int consIdx, ToIntFunction<Constituent> f) {
+    BitSet bs = new BitSet(lhs.length);
+    for (ConstituentItr i = getConstituentItr(consIdx); i.isValid(); i.gotoRightSib()) {
+      int v = f.applyAsInt(i);
+      bs.set(v);
+    }
+    return bs;
+  }
+
   /* END OF CONVENIENCE METHODS ***********************************************/
 
 
@@ -270,6 +291,9 @@ public final class Document implements Serializable {
     this.id = id;
     this.index = index;
     this.alph = alph;
+    int initSize = 64;
+    reserveTokens(initSize);
+    reserveConstituents(initSize);
   }
 
   /** May be slow: uses java serialization (for safety) */
@@ -299,6 +323,14 @@ public final class Document implements Serializable {
 
   public int numConstituents() {
     return consTop;
+  }
+
+  public boolean allowExpansion() {
+    return allowExpansion;
+  }
+
+  public void allowExpansion(boolean flag) {
+    this.allowExpansion = flag;
   }
 
   /**
@@ -373,6 +405,10 @@ public final class Document implements Serializable {
     if (numTokens <= 0)
       throw new IllegalArgumentException();
 
+    if (LOG_ALLOCATIONS)
+      Log.info(word.length + " => " + numTokens);
+    assert allowExpansion;
+
     word = copy(word, numTokens, UNINITIALIZED);
     wordNocase = copy(wordNocase, numTokens, UNINITIALIZED);
     pos = copy(pos, numTokens, UNINITIALIZED);
@@ -402,6 +438,11 @@ public final class Document implements Serializable {
   public void reserveConstituents(int numConstituents) {
     if (numConstituents < 0)
       throw new IllegalArgumentException();
+
+    if (LOG_ALLOCATIONS)
+      Log.info(lhs.length + " => " + numConstituents);
+    assert allowExpansion;
+
     lhs = copy(lhs, numConstituents, UNINITIALIZED);
     parent = copy(parent, numConstituents, UNINITIALIZED);
     leftChild = copy(leftChild, numConstituents, UNINITIALIZED);
@@ -462,6 +503,10 @@ public final class Document implements Serializable {
      */
     public Token getToken(int i) {
       return new Token(getStart() + i);
+    }
+
+    public String show() {
+      return show(alph);
     }
 
     @Override
@@ -586,16 +631,27 @@ public final class Document implements Serializable {
     return this.new Token(i);
   }
   public Token newToken() {
-    return this.new Token(tokTop++);
+    Token t = this.new Token(tokTop++);
+    if (allowExpansion && t.getIndex() >= word.length) {
+      double rate = 1.6;
+      int newSize = (int) (rate * word.length + 1);
+      Document.this.reserveTokens(newSize);
+    }
+    return t;
   }
   public TokenItr newTokenItr() {
-    return this.new TokenItr(tokTop++);
+    TokenItr t = this.new TokenItr(tokTop++);
+    if (allowExpansion && t.getIndex() >= word.length) {
+      double rate = 1.6;
+      int newSize = (int) (rate * word.length + 1);
+      Document.this.reserveTokens(newSize);
+    }
+    return t;
   }
 
 
   /** For using Token like an iterator (be careful!) */
   public class TokenItr extends Token {
-    private boolean allowExpansion = true;
 
     public TokenItr(int index) {
       super(index);
@@ -608,12 +664,6 @@ public final class Document implements Serializable {
     public int forwards() {
       int old = index;
       index++;
-      tokTop++;
-      if (allowExpansion && index >= word.length) {
-        double rate = 1.6;
-        int newSize = (int) (rate * word.length + 1);
-        Document.this.reserveTokens(newSize);
-      }
       return old;
     }
 
@@ -764,59 +814,30 @@ public final class Document implements Serializable {
     return this.new Constituent(c);
   }
   public Constituent newConstituent() {
-    return this.new Constituent(consTop++);
+    Constituent c = this.new Constituent(consTop++);
+    if (allowExpansion && c.getIndex() >= lhs.length) {
+      double rate = 1.6;
+      int newSize = (int) (rate * lhs.length + 1);
+      Document.this.reserveConstituents(newSize);
+    }
+    return c;
   }
   public ConstituentItr newConstituentItr() {
-    return this.new ConstituentItr(consTop++);
+    ConstituentItr c = this.new ConstituentItr(consTop++);
+    if (allowExpansion && c.getIndex() >= lhs.length) {
+      double rate = 1.6;
+      int newSize = (int) (rate * lhs.length + 1);
+      Document.this.reserveConstituents(newSize);
+    }
+    return c;
   }
 
 
   /** A class for traversing and adding constituents. */
   public class ConstituentItr extends Constituent {
-    // Whether the forwards method should allow constituent fields to be re-allocated
-    private boolean allowExpansion;
 
     public ConstituentItr(int index) {
       super(index);
-      allowExpansion = false;
-    }
-
-    public boolean allowExpansion() {
-      return allowExpansion;
-    }
-
-    public void allowExpansion(boolean flag) {
-      this.allowExpansion = flag;
-    }
-
-    /** Returns the constituent index before the update is applied */
-    public int forwards() {
-      int old = index;
-      index++;
-      consTop++;
-      if (allowExpansion && index >= lhs.length) {
-        double rate = 1.6;
-        int newSize = (int) (rate * lhs.length + 1);
-        Document.this.reserveConstituents(newSize);
-      }
-      return old;
-    }
-
-    /** Returns the constituent before the update is applied */
-    public Constituent forwardsC() {
-      return Document.this.getConstituent(forwards());
-    }
-
-    /** Returns the constituent index before the update is applied */
-    public int backwards() {
-      int old = index;
-      index--;
-      return old;
-    }
-
-    /** Returns the constituent before the update is applied */
-    public Constituent backwardsC() {
-      return Document.this.getConstituent(backwards());
     }
 
     public boolean isValid() {
@@ -857,24 +878,6 @@ public final class Document implements Serializable {
   }
   public ConstituentItr getConstituentItr(int c) {
     return this.new ConstituentItr(c);
-  }
-
-
-  public class Sentence extends Slice {
-    public static final int BREAK_LEVEL = 1;
-    public final int breakLevel = BREAK_LEVEL;
-    public Sentence(int start, int length) {
-      super(start, length);
-    }
-  }
-
-
-  public class Paragraph extends Slice {
-    public static final int BREAK_LEVEL = 2;
-    public final int breakLevel = BREAK_LEVEL;
-    public Paragraph(int start, int length) {
-      super(start, length);
-    }
   }
 
 }

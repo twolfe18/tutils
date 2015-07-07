@@ -3,6 +3,7 @@ package edu.jhu.hlt.tutils;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import edu.jhu.hlt.concrete.ingest.conll.Conll2011;
 import edu.jhu.hlt.tutils.Document.Constituent;
 import edu.jhu.hlt.tutils.Document.ConstituentItr;
 import edu.jhu.hlt.tutils.Document.ConstituentType;
+import edu.jhu.hlt.tutils.Document.Token;
 import edu.mit.jwi.IRAMDictionary;
 import edu.mit.jwi.RAMDictionary;
 import edu.mit.jwi.data.ILoadPolicy;
@@ -124,7 +126,6 @@ public class ConcreteToDocument {
       Tokenization t,
       TokenTagging pos,
       TokenTagging ner,
-      int tokenOffset,
       int tokenIdx,
       MultiAlphabet alph) {
     edu.jhu.hlt.concrete.Token ct = t.getTokenList().getTokenList().get(tokenIdx);
@@ -170,13 +171,12 @@ public class ConcreteToDocument {
   public static Constituent addCorefConstituents(
       EntitySet coref,
       EntityMentionSet mentions,
-      Document.ConstituentItr cons,
+      Document doc,
       ConcreteDocumentMapping mapping,
       MultiAlphabet alph) {
 
     int added = 0;
-    Document doc = cons.getDocument();
-    Constituent start = doc.getConstituent(cons.getIndex());
+    Constituent start = doc.newConstituent();
 
     // In the event that there are no entities in this coreference set
     // (this is allowed, there must be 1+ mentions in each entity, but there
@@ -195,10 +195,10 @@ public class ConcreteToDocument {
       if (ent.getMentionIdListSize() == 0)
         throw new RuntimeException("empty Entity?");
 
-      Constituent entC = cons.forwardsC();
+      Constituent entC = added == 0 ? start : doc.newConstituent();
       entC.setParent(Document.NONE);
       entC.setLhs(alph.word(ent.getType()));
-      entC.setOnlyChild(cons.getIndex());
+      entC.setOnlyChild(Document.NONE);
       entC.setLeftSib(prevEnt);
       entC.setRightSib(Document.NONE);
       if (prevEnt != Document.NONE)
@@ -210,6 +210,13 @@ public class ConcreteToDocument {
 
       int prevMention = Document.NONE;
       for (UUID emId : ent.getMentionIdList()) {        // LOOP over Mentions
+
+        Constituent cons = doc.newConstituent();
+
+        // Update parent
+        if (entC.getLeftChild() == Document.NONE)
+          entC.setLeftChild(cons.getIndex());
+        entC.setRightChild(cons.getIndex());
 
         // Update mapping: EntityMention.UUID
         mapping.put(doc.getConstituent(cons.getIndex()), emId);
@@ -235,7 +242,6 @@ public class ConcreteToDocument {
         if (prevMention != Document.NONE)
           doc.getConstituent(prevMention).setRightSib(cons.getIndex());
         prevMention = cons.getIndex();
-        cons.forwards();
         added++;
       }
     }
@@ -262,13 +268,18 @@ public class ConcreteToDocument {
    * Concrete child indices are sentence-relative but Document.Constituent's are
    * document-relative. tokenOffset says how many tokens have come before this
    * parse/sentence to allow conversion.
+   *
+   * @return the root of the converted tree.
    */
-  public void addParseConstituents(
+  public Constituent addParseConstituents(
       Parse p,
       int tokenOffset,
-      Document.ConstituentItr cons,
+      Document doc,
       Map<ConstituentRef, Integer> constituentIndices,
       MultiAlphabet alph) {
+
+    BitSet isNotChild = new BitSet();   // constituent indices
+    int adds = 0;
 
     // Build the constituents and mapping between them
     int nCons = p.getConstituentListSize();
@@ -279,6 +290,9 @@ public class ConcreteToDocument {
         Log.info("ccon=" + ccon);
       assert ccon.isSetStart() == ccon.isSetEnding();
 
+      adds++;
+      Constituent cons = doc.newConstituent();
+      isNotChild.set(cons.getIndex(), true);
       cons.setLhs(alph.cfg(ccon.getTag()));
       cons.setParent(Document.NONE);      // Will be over-written later
       cons.setOnlyChild(Document.NONE);   // Will be over-written later
@@ -294,7 +308,6 @@ public class ConcreteToDocument {
       if (ccon.getChildListSize() == 0) {
         if (cons.getFirstToken() < 0 || cons.getLastToken() < 0)
           throw new RuntimeException();
-        Document doc = cons.getDocument();
         int[] cons_parent = doc.getConsParent(consParseToolType);
         for (int i = cons.getFirstToken(); i <= cons.getLastToken(); i++) {
           if (cons_parent[i] != Document.UNINITIALIZED)
@@ -304,25 +317,25 @@ public class ConcreteToDocument {
       }
 
       // Store this Constituents index
-      int i = cons.forwards();
+      int i = cons.getIndex();
       ConstituentRef cr = new ConstituentRef(p.getUuid(), pl++);
       Integer old = constituentIndices.put(cr, i);
       if (old != null) throw new RuntimeException();
     }
 
     // Set parent, left/right children, and left/right sibling
-    Document d = cons.getDocument();
     for (edu.jhu.hlt.concrete.Constituent ccon : p.getConstituentList()) {
       int parentIdx = ccon2dcon[ccon.getId()];
-      Document.Constituent parent = d.getConstituent(parentIdx);
+      Document.Constituent parent = doc.getConstituent(parentIdx);
       int prevChildIdx = Document.NONE;
       for (int child : ccon.getChildList()) {
         int childIdx = ccon2dcon[p.getConstituentList().get(child).getId()];
-        Document.Constituent c = d.getConstituent(childIdx);
+        isNotChild.set(childIdx, false);
+        Document.Constituent c = doc.getConstituent(childIdx);
         c.setParent(parentIdx);
         c.setLeftSib(prevChildIdx);
         if (prevChildIdx >= 0)
-          d.getConstituent(prevChildIdx).setRightSib(childIdx);
+          doc.getConstituent(prevChildIdx).setRightSib(childIdx);
         if (parent.getLeftChild() < 0) {
           if (debug_cons) {
             Log.info("setting " + parent.show(alph) + ".firstChild=" + c.show(alph));
@@ -336,8 +349,25 @@ public class ConcreteToDocument {
         prevChildIdx = childIdx;
       }
       if (prevChildIdx >= 0)
-        d.getConstituent(prevChildIdx).setRightSib(Document.NONE);
+        doc.getConstituent(prevChildIdx).setRightSib(Document.NONE);
     }
+
+    if (isNotChild.cardinality() != 1)
+      throw new RuntimeException("isNotChild: " + isNotChild);
+    Constituent root = doc.getConstituent(isNotChild.nextSetBit(0));
+
+    if (adds == 0) {
+      // NOTE: There is at least one sentence in Ontonotes5 which has a
+      // parse which is something like (TOP (S (NP (-NONE- PRO)))), which
+      // has no leaf tokens. In the skel/conll (tabular format) this still
+      // has a row with no annotations. This will be as if we skipped that
+      // sentence.
+      // /home/travis/code/fnparse/data/ontonotes-release-5.0/LDC2013T19/data/files/data/english/annotations/nw/p2.5_c2e/00/p2.5_c2e_0034.parse
+      // (TOP (S (NP-SBJ (-NONE- *PRO*))))
+      Log.warn("there is an empty tree for this sentence:"
+          + " parse=" + p.getUuid());
+    }
+    return root;
   }
 
   public Constituent addPropbankSrl(
@@ -345,129 +375,139 @@ public class ConcreteToDocument {
       String situationMentionSetToolName,
       Map<ConstituentRef, Integer> constituentIndices,  // TODO fold into mapping
       ConcreteDocumentMapping mapping,
-      Document.ConstituentItr constituent,
       MultiAlphabet alph) {
 
-    Document doc = constituent.getDocument();
-    assert doc == mapping.getDocument();
+    Document doc = mapping.getDocument();
 
     Constituent first = null;
     SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), situationMentionSetToolName);
     if (sms == null) {
       System.err.println("failed to find SituationMentionSet by tool: " + situationMentionSetToolName);
-    } else {
-      // What if there are no situations?
-      first = doc.getConstituent(constituent.getIndex());
-      constituent.setParent(Document.NONE);
-      constituent.setOnlyChild(Document.NONE);
-      constituent.setLhs(alph.srl("EMPTY-SRL"));
-      constituent.setFirstToken(Document.NONE);
-      constituent.setLastToken(Document.NONE);
-      constituent.setLeftSib(Document.NONE);
-      constituent.setRightSib(Document.NONE);
-      int prevSit = Document.NONE;
-      for (SituationMention sm : sms.getMentionList()) {
+      return null;
+    }
 
-        // Make a situation node which is the parent of all the pred/args
-        Constituent sit = constituent.forwardsC();
-        sit.setLhs(alph.srl("propbank"));
-        sit.setLeftSib(prevSit);
-        sit.setRightSib(Document.NONE); // will be over-written
-        sit.setParent(Document.NONE);
-        if (prevSit != Document.NONE)
-          doc.getConstituent(prevSit).setRightSib(sit.getIndex());
-        prevSit = sit.getIndex();
+    int prevSit = Document.NONE;
+    for (SituationMention sm : sms.getMentionList()) {
 
-        // Constituent index of previous pred/arg
-        int prev = Document.NONE;
+      // Make a situation node which is the parent of all the pred/args
+      Constituent sit = doc.newConstituent();
+      sit.setLhs(alph.srl("propbank"));
+      sit.setLeftSib(prevSit);
+      sit.setRightSib(Document.NONE); // will be over-written
+      sit.setParent(Document.NONE);
+      if (prevSit != Document.NONE)
+        doc.getConstituent(prevSit).setRightSib(sit.getIndex());
+      prevSit = sit.getIndex();
 
-        // Set the predicate
+      // Set the predicate
+      // first/last tokens + left/right children
+      Constituent pred = doc.newConstituent();
+      setupConstituent(sm.getConstituent(), sm.getTokens(), pred,
+          constituentIndices, mapping, doc);
+      // Everything else
+      pred.setLhs(alph.srl(sm.getSituationKind()));
+      pred.setParent(sit.getIndex());
+      pred.setLeftSib(Document.NONE);
+      pred.setRightSib(Document.NONE);
+
+      // Set sit -> pred
+      sit.setOnlyChild(pred.getIndex());
+      if (debug)
+        Log.info("adding Situation text=\"" + sm.getText());
+
+      // Set the parent links (verb token -> propbank cons node)
+      assert pred.getFirstToken() >= 0;
+      assert pred.getLastToken() >= 0;
+      int[] parents = doc.getConsParent(ConstituentType.PROPBANK_GOLD);
+      for (int tokI = pred.getFirstToken(); tokI <= pred.getLastToken(); tokI++) {
+        parents[tokI] = pred.getIndex();
+      }
+
+      if (debug) {
+        Log.info("pred.firstToken=" + pred.getFirstToken()
+            + " pred.lastToken=" + pred.getLastToken());
+      }
+
+      // Store the bounds of the entire situation
+      int firstT = pred.getFirstToken();
+      int lastT = pred.getLastToken();
+
+      // Set the arguments
+      int prev = pred.getIndex();
+      int numArgs = sm.getArgumentListSize();
+      for (int ai = 0; ai < numArgs; ai++) {
+        MentionArgument arg = sm.getArgumentList().get(ai);
+        Constituent argc = doc.newConstituent();
         // first/last tokens + left/right children
-        setupConstituent(sm.getConstituent(), sm.getTokens(), constituent,
+        setupConstituent(arg.getConstituent(), arg.getTokens(), argc,
             constituentIndices, mapping, doc);
         // Everything else
-        constituent.setLhs(alph.srl(sm.getSituationKind()));
-        constituent.setParent(sit.getIndex());
-        constituent.setLeftSib(Document.NONE);
-        constituent.setRightSib(Document.NONE);
+        argc.setLhs(alph.srl(arg.getRole()));
+        argc.setParent(sit.getIndex());
+        argc.setLeftSib(prev);
+        argc.setRightSib(Document.NONE);
 
-        // Set sit -> pred
-        sit.setLeftChild(constituent.getIndex());
-        sit.setRightChild(constituent.getIndex());
-        if (debug) {
-          Log.info("adding Situation text=\"" + sm.getText()
-              + "\" first=" + constituent.getFirstToken()
-              + " last=" + constituent.getLastToken());
-        }
+        doc.getConstituent(prev).setRightSib(argc.getIndex());
 
-        // Set the parent links (verb token -> propbank cons node)
-        assert constituent.getFirstToken() >= 0;
-        assert constituent.getLastToken() >= 0;
-        int[] parents = doc.getConsParent(ConstituentType.PROPBANK_GOLD);
-        for (int tokI = constituent.getFirstToken(); tokI <= constituent.getLastToken(); tokI++) {
-          parents[tokI] = constituent.getIndex();
-        }
+        // Update bounds of entire situation
+        assert argc.getFirstToken() >= 0;
+        if (argc.getFirstToken() < firstT)
+          firstT = argc.getFirstToken();
+        assert argc.getLastToken() >= 0;
+        if (argc.getLastToken() > lastT)
+          lastT = argc.getLastToken();
 
         if (debug) {
-          Log.info("pred.firstToken=" + constituent.getFirstToken()
-              + " pred.lastToken=" + constituent.getLastToken());
+          Log.info("setting arg, role=" + arg.getRole()
+              + " first=" + argc.getFirstToken()
+              + " last=" + argc.getLastToken()
+              + " leftChild=" + argc.getLeftChild()
+              + " rightChild=" + argc.getRightChild());
         }
 
-        // Store the bounds of the entire situation
-        int firstT = constituent.getFirstToken();
-        int lastT = constituent.getLastToken();
+        // Update right child of situation
+        sit.setRightChild(argc.getIndex());
 
-        prev = constituent.forwards();
+        prev = argc.getIndex();
+      }
 
-        // Set the arguments
-        int numArgs = sm.getArgumentListSize();
-        for (int ai = 0; ai < numArgs; ai++) {
-          MentionArgument arg = sm.getArgumentList().get(ai);
-          // first/last tokens + left/right children
-          setupConstituent(arg.getConstituent(), arg.getTokens(), constituent,
-              constituentIndices, mapping, doc);
-          // Everything else
-          constituent.setLhs(alph.srl(arg.getRole()));
-          constituent.setParent(sit.getIndex());
-          constituent.setLeftSib(prev);
-          constituent.setRightSib(Document.NONE);
+      // Set the first and last token for the entire situation
+      sit.setFirstToken(firstT);
+      sit.setLastToken(lastT);
 
-          doc.getConstituent(prev).setRightSib(constituent.getIndex());
-
-          // Update bounds of entire situation
-          assert constituent.getFirstToken() >= 0;
-          if (constituent.getFirstToken() < firstT)
-            firstT = constituent.getFirstToken();
-          assert constituent.getLastToken() >= 0;
-          if (constituent.getLastToken() > lastT)
-            lastT = constituent.getLastToken();
-
-          if (debug) {
-            Log.info("setting arg, role=" + arg.getRole()
-                + " first=" + constituent.getFirstToken()
-                + " last=" + constituent.getLastToken()
-                + " leftChild=" + constituent.getLeftChild()
-                + " rightChild=" + constituent.getRightChild());
-          }
-
-          // Update right child of situation
-          sit.setRightChild(constituent.getIndex());
-
-          prev = constituent.forwards();
-        }
-
-        // Set the first and last token for the entire situation
-        sit.setFirstToken(firstT);
-        sit.setLastToken(lastT);
-
-        if (debug) {
-          Log.info("sit.firstToken=" + sit.getFirstToken()
-              + " sit.lastToken=" + sit.getLastToken()
-              + " numArgs=" + numArgs);
-        }
+      if (debug) {
+        Log.info("sit.firstToken=" + sit.getFirstToken()
+            + " sit.lastToken=" + sit.getLastToken()
+            + " numArgs=" + numArgs);
       }
     }
     return first;
+  }
+
+  public void addParagraphs(Communication c, Document doc) {
+    int paragraphStart = 0;
+    int prevPar = Document.NONE;
+    doc.cons_paragraph = Document.NONE;
+    for (Section s : c.getSectionList()) {
+      int sectionLen = 0;
+      for (Sentence ss : s.getSentenceList()) {
+        Tokenization tkz = ss.getTokenization();
+        sectionLen += tkz.getTokenList().getTokenListSize();
+      }
+      Constituent constituent = doc.newConstituent();
+      if (doc.cons_paragraph == Document.NONE)
+        doc.cons_paragraph = constituent.getIndex();
+      constituent.setParent(Document.NONE);
+      constituent.setOnlyChild(Document.NONE);
+      constituent.setLeftSib(prevPar);
+      constituent.setFirstToken(paragraphStart);
+      constituent.setLastToken(paragraphStart + sectionLen - 1);
+      constituent.setRightSib(Document.NONE);
+      if (prevPar >= 0)
+        doc.getConstituent(prevPar).setRightSib(constituent.getIndex());
+      prevPar = constituent.getIndex();
+      paragraphStart += sectionLen;
+    }
   }
 
   /**
@@ -477,17 +517,13 @@ public class ConcreteToDocument {
       Communication c, int docIndex, MultiAlphabet alph) {
 
     Document doc = new Document(c.getId(), docIndex, alph);
+    doc.allowExpansion(true);
     ConcreteDocumentMapping mapping = new ConcreteDocumentMapping(c, doc);
-    Document.ConstituentItr constituent = doc.getConstituentItr(0);
-    constituent.allowExpansion(true);
-    doc.reserveConstituents(64);
 
     // Count the number of tokens and add the sentence sectioning
-    doc.cons_sentences = constituent.getIndex();
     int sectionIdx = 0;
     int numToks = 0;
     int prevSent = Document.NONE;
-    // TODO add section segmentation as separate constituency parse?
     // Note that this info is already captured in the LHS of the sentence segmentation/cparse
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
@@ -495,6 +531,10 @@ public class ConcreteToDocument {
         Tokenization tkz = ss.getTokenization();
         int start = numToks;
         numToks += tkz.getTokenList().getTokenListSize();
+
+        Constituent constituent = doc.newConstituent();
+        if (doc.cons_sentences == Document.NONE)
+          doc.cons_sentences = constituent.getIndex();
 
         // Update mapping: Document.Constituent <=> Tokenization.UUID
         mapping.put(doc.getConstituent(constituent.getIndex()), tkz.getUuid());
@@ -508,22 +548,22 @@ public class ConcreteToDocument {
         constituent.setLeftSib(prevSent);
         if (prevSent != Document.NONE)
           doc.getConstituent(prevSent).setRightSib(constituent.getIndex());
-        prevSent = constituent.forwards();
+        prevSent = constituent.getIndex();
       }
       sectionIdx++;
     }
 
+    // Add paragraph/section segmentation as linked list of constituents
+    addParagraphs(c, doc);
+
     // Build the Document
     DocumentTester test = new DocumentTester(doc, true);
-    doc.reserveTokens(numToks);
-    Document.TokenItr token = doc.getTokenItr(0);
+    int tokenOffset = 0;
     Map<ConstituentRef, Integer> constituentIndices = new HashMap<>();
     int prevParse = Document.NONE;
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
 
-        int tokenOffset = token.getIndex();
-        if (debug) Log.info("tokenOffset=" + tokenOffset);
         Tokenization tkz = ss.getTokenization();
 
         TokenTagging pos = null;
@@ -535,43 +575,24 @@ public class ConcreteToDocument {
 
         int n = tkz.getTokenList().getTokenListSize();
         for (int i = 0; i < n; i++) {
-          setToken(token, c, tkz, pos, ner, tokenOffset, i, alph);
+          Token token = doc.newToken();
+          setToken(token, c, tkz, pos, ner, i, alph);
           if (debug) {
-            Log.info("just set token[" + token.index + "]=" + token.getWordStr());
+            Log.info("just set token[" + token.getIndex() + "]=" + token.getWordStr());
           }
-          token.forwards();
         }
 
         Parse p = findByTool(tkz.getParseList(), consParseToolName);
-        int start = constituent.getIndex();
-
+        Constituent root = addParseConstituents(p, tokenOffset, doc, constituentIndices, alph);
         if (doc.cons_ptb_gold == Document.NONE)
-          doc.cons_ptb_gold = start;
-        constituent.setLeftSib(prevParse);
-        constituent.setRightSib(Document.NONE);
+          doc.cons_ptb_gold = root.getIndex();
+        root.setParent(Document.NONE);
+        root.setLeftSib(prevParse);
+        root.setRightSib(Document.NONE);
         if (prevParse != Document.NONE)
-          doc.getConstituent(prevParse).setRightSib(constituent.getIndex());
-        prevParse = constituent.getIndex();
-
-        addParseConstituents(p, tokenOffset, constituent, constituentIndices, alph);
-        int end = constituent.getIndex() - 1;
-        if (start == end) {
-          // NOTE: There is at least one sentence in Ontonotes5 which has a
-          // parse which is something like (TOP (S (NP (-NONE- PRO)))), which
-          // has no leaf tokens. In the skel/conll (tabular format) this still
-          // has a row with no annotations. This will be as if we skipped that
-          // sentence.
-          // /home/travis/code/fnparse/data/ontonotes-release-5.0/LDC2013T19/data/files/data/english/annotations/nw/p2.5_c2e/00/p2.5_c2e_0034.parse
-          // (TOP (S (NP-SBJ (-NONE- *PRO*))))
-          Log.warn("there is an empty tree for this sentence:"
-              + " communication=" + c.getId()
-              + " section=" + s.getUuid()
-              + " sentence=" + ss.getUuid()
-              + " tokenization=" + tkz.getUuid());
-        } else {
-          assert end > start : "start=" + start + " end=" + end;
-          assert test.checkConstituencyTree(start, end);
-        }
+          doc.getConstituent(prevParse).setRightSib(root.getIndex());
+        prevParse = root.getIndex();
+        tokenOffset += n;
       }
     }
 
@@ -583,7 +604,7 @@ public class ConcreteToDocument {
     // Add Propbank SRL
     if (this.propbankSrlToolName != null) {
       Constituent propbankSrl = addPropbankSrl(c, this.propbankSrlToolName,
-          constituentIndices, mapping, constituent, alph);
+          constituentIndices, mapping, alph);
       if (propbankSrl == null)
         Log.warn("Failed to get Propbank SRL");
       else
@@ -598,7 +619,7 @@ public class ConcreteToDocument {
       if (!es.isSetMentionSetId())
         throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
       EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
-      Constituent coref = addCorefConstituents(es, ems, constituent, mapping, alph);
+      Constituent coref = addCorefConstituents(es, ems, doc, mapping, alph);
       if (coref == null)
         throw new RuntimeException("emtpy EntitySet? " + es.getUuid());
       else
@@ -615,7 +636,7 @@ public class ConcreteToDocument {
   /**
    * Given a {@link ConstituentRef} and a {@link TokenRefSequence}, each of
    * which may be null, set the left/right children fields as well as the
-   * first/last token fields for the {@link ConstituentItr}. If the
+   * first/last token fields for the {@link Constituent}. If the
    * {@link ConstituentRef} is null, this will insert a dummy constituent
    * corresponding the to {@link TokenRefSequence} and advance the
    * {@link ConstituentItr}, meaning that anything that fields that were set
@@ -624,7 +645,7 @@ public class ConcreteToDocument {
   private void setupConstituent(
       ConstituentRef cr,
       TokenRefSequence trs,
-      ConstituentItr constituent,
+      Constituent constituent,
       Map<ConstituentRef, Integer> constituentIndices,
       ConcreteDocumentMapping mapping,  // used for Tokenization.UUID => Constituent => firstToken
       Document doc) {
@@ -647,12 +668,12 @@ public class ConcreteToDocument {
       constituent.setLastToken(e);
       constituent.setLeftSib(Document.NONE);
       constituent.setRightSib(Document.NONE);
-      constituent.setOnlyChild(Document.NONE);
-      int dummySpan = constituent.forwards();
-      constituent.setOnlyChild(dummySpan);
-      int parent = constituent.gotoConstituent(dummySpan);
-      constituent.setParent(parent);
-      constituent.gotoConstituent(parent);
+
+      Constituent dummySpan = doc.newConstituent();
+      constituent.setOnlyChild(dummySpan.getIndex());
+      dummySpan.setParent(constituent.getIndex());
+      dummySpan.setFirstToken(s);
+      dummySpan.setLastToken(e);
     }
     assert constituent.getLeftChild() == constituent.getRightChild();
     constituent.setFirstToken(doc.getFirstToken(constituent.getLeftChild()));
