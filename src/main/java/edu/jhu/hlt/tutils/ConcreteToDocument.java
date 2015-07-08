@@ -25,7 +25,6 @@ import edu.jhu.hlt.concrete.TokenRefSequence;
 import edu.jhu.hlt.concrete.TokenTagging;
 import edu.jhu.hlt.concrete.Tokenization;
 import edu.jhu.hlt.concrete.UUID;
-import edu.jhu.hlt.concrete.ingest.conll.Conll2011;
 import edu.jhu.hlt.tutils.Document.Constituent;
 import edu.jhu.hlt.tutils.Document.ConstituentItr;
 import edu.jhu.hlt.tutils.Document.ConstituentType;
@@ -53,13 +52,13 @@ public class ConcreteToDocument {
   public boolean debug_cons = false;
 
   /** Only supports a single POS {@link TokenTagging} for now */
-  protected String posToolName = Conll2011.META_POS.getTool();
+  protected String posToolName = "conll-2011 POS";
 
   /** Only supports {@link TokenTagging} style NER for now */
-  protected String nerToolName = Conll2011.META_NER.getTool();
+  protected String nerToolName = "conll-2011 NER";
 
   /** Only supports a single {@link Parse} for now */
-  protected String consParseToolName = Conll2011.META_PARSE.getTool();
+  protected String consParseToolName = "conll-2011 parse";
   // TODO allow this to be set set separately
   protected ConstituentType consParseToolType = ConstituentType.PTB_GOLD;
 
