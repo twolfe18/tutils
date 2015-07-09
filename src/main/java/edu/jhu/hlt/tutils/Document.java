@@ -44,38 +44,12 @@ public final class Document implements Serializable {
   // Whether the forwards method should allow constituent fields to be re-allocated
   private boolean allowExpansion = true;
 
-  /* GRAPHS *******************************************************************/
-  // A note on graphs:
-  // One goal was to be able to have a Token which is just an index into the
-  // document and be able to do a multi-graph traversal from just that int.
-  // Constituency trees force the user to have another type of index due to the
-  // non-token-indexedness of constituents, but graphs go one step further
-  // due to the unknown number of parents. I may try to fold in the adjacency
-  // list style representation used in LabeledDirectedGraph into Document to be
-  // flat and easy to use, but I have to work out how to do this later. TODO
-
-  // Actually I think this is pretty easy:
-  // Only need two fields: long[] edges and int[] splitPoints.
-  // Just need to absorb LabeledDirectedGraph.Node into this class as GraphNode or something.
-  // Maybe have a single long[] edges and many int[] splitPoints, one for each
-  // parse type?
-
-  // See http://nlp.stanford.edu/software/dependencies_manual.pdf
-  LabeledDirectedGraph stanfordDepsBasic;
-  LabeledDirectedGraph stanfordDepsCollapsed;
-  LabeledDirectedGraph stanfordDepsCollapsedCC;
-
-  // See http://universaldependencies.github.io/docs/u/overview/syntax.html
-  LabeledDirectedGraph universalDependencies;
-
-
   /* MEMORY BOOK-KEEPING ******************************************************/
   int tokTop = 0;     // index of first un-used token
   int consTop = 0;    // index of first un-used constituent
 
 
   /* TOKEN-INDEXED FIELDS *****************************************************/
-
   int[] word;
   int[] wordNocase;
   int[] posG;         // gold
@@ -89,82 +63,24 @@ public final class Document implements Serializable {
   int[] shape;
   int[] sense;
 
-  /* Pointers from token -> leaf constituent **********************************/
-  // TODO Think about whether these should be kept at all.
-  /*
-   * NOTE: These should be removed: they are just an index on info that is already
-   * in the constituency trees. Namely, those trees have first/last token. The
-   * correct way to do this is to have an index object which basically builds
-   * these data structures (or maybe more efficient ones) from the trees for
-   * querying, but which can be thrown away at any time.
-   * This has the nice benefit of not needing an extra value for every token
-   * PER TOOL; how I did constituents scales down nicely to not take space when
-   * not all tools are used.
-   */
 
-  // The index of a constituency tree node immediately dominated by this token.
-  // May be -1 for constituency trees that don't cover the entire span.
-  // Constituents have an implicit type, which is which one of these fields you
-  // got the constituent from
-  int[] cons_parent_ptb_gold;
-  int[] cons_parent_ptb_auto;
+  /* CONSTITUENT-INDEXED FIELDS ***********************************************/
+  int[] lhs;          // left hand side of a CFG rule, e.g. "NP" or "SBAR", NOT a POS tag (that would mean 1 Constituent per word, we want to stay one level higher than that)
+  int[] leftChild;    // < 0 for leaf nodes
+  int[] rightSib;
+  int[] firstToken;   // Document token index, inclusive
+  int[] lastToken;    // Document token index, inclusive
 
-  // Propbank is represented as a list of predicate/argument nodes, each having
-  // a `lhs` field specifying if it is e.g. "throw-v-1" (for a predicate) or
-  // "ARG1" (for an argument). Each of these nodes has a single child, which is
-  // either a real constituency node (which may be a part of another tree and
-  // have a different parent) or a dummy span only created for the purpose of
-  // specifying a span of text.
-  // In this list of pred/arg nodes, the predicates come first. If an argument
-  // is split (e.g. "ARG3" and "C-ARG3"), the the continuation argument must
-  // immediately follow the continued role. Predicate nodes may also be split
-  // (and should appear first and next to each other) in principle, but some
-  // code may assume this never happens...
-  // The nodes in this list will have a common parent denoting a proposition.
-  // TODO Choose the parent/sibling structure of these proposition nodes. Could
-  // 1) make them all siblings with a dummy root or 2) make propositions in the
-  // same sentence siblings and insert a sentence level parent. I'm leaning
-  // towards (1) in the name of remaining flat and leaving the document
-  // structure up to the breaks field.
-  // THESE ARRAYS are used to serve as a pointer from *predicate tokens* up to
-  // predicate nodes. All tokens which do not trigger a predicate will have the
-  // value -1. The reason this field is not used for arguments as well is that
-  // a token may serve in multiple arguments (probably not in the same
-  // proposition, but in different propositions in the same sentence).
-  int[] cons_parent_propbank_gold;
-  int[] cons_parent_propbank_auto;
+  // Things below this line need not be saved (can be re-derived)
+  int[] parent;       // Constituent index, -1 for roots
+  int[] rightChild;   // < 0 for leaf nodes
+  int[] leftSib;
+  int[] depth;
 
-  // TODO Clarify these. I had planned to support hierarchical NER.
-  int[] cons_parent_ner_gold;
-  int[] cons_parent_ner_auto;
-
-  public static enum ConstituentType {
-    PTB_GOLD,
-    PTB_AUTO,
-    PROPBANK_GOLD,
-    PROPBANK_AUTO,
-    NER_GOLD,
-    NER_AUTO,
-  }
-  // Sort of arbitrary that this is flat vs a 2d array...
-  public int[] getConsParent(ConstituentType consType) {
-    switch (consType) {
-      case PTB_GOLD:
-        return cons_parent_ptb_gold;
-      case PTB_AUTO:
-        return cons_parent_ptb_auto;
-      case PROPBANK_GOLD:
-        return cons_parent_propbank_gold;
-      case PROPBANK_AUTO:
-        return cons_parent_propbank_auto;
-      case NER_GOLD:
-        return cons_parent_ner_gold;
-      case NER_AUTO:
-        return cons_parent_ner_auto;
-      default:
-        throw new RuntimeException("consType=" + consType);
-    }
-  }
+  // TODO Concerning the problem of fitting enough information into `lhs` and
+  // the need for features: I think I'm going to have to add
+  // constituent -> FeatureVector and token -> FeatureVector
+  // mappings.
 
 
   /* LINKED LISTS OF CONSTITUENTS *********************************************/
@@ -198,39 +114,44 @@ public final class Document implements Serializable {
   public int cons_coref_gold = NONE;
   public int cons_coref_auto = NONE;
 
-  /* END OF LINKED LIST OF CONSTITUENTS ***************************************/
 
+  /* TOKEN TO CONSTITUENT MAPPINGS ********************************************/
+  // Constituents have spans (firstToken,lastToken), and sometimes you want to
+  // go from a token to a constituent dominated by it. These build an index off
+  // of the data in constituents and let you do that.
 
-  /* CONSTITUENT-INDEXED FIELDS ***********************************************/
-  int[] lhs;          // left hand side of a CFG rule, e.g. "NP" or "SBAR", NOT a POS tag (that would mean 1 Constituent per word, we want to stay one level higher than that)
+  // Add more as needed
 
-  int[] leftChild;    // < 0 for leaf nodes
-  int[] rightSib;
+  transient TokenToConstituentIndex t2c_ptb_gold;
+  public TokenToConstituentIndex getT2cPtbGold() {
+    assert cons_ptb_gold >= 0;
+    if (t2c_ptb_gold == null)
+      t2c_ptb_gold = new TokenToConstituentIndex(this, cons_ptb_gold);
+    return t2c_ptb_gold;
+  }
 
-  int[] firstToken;   // Document token index, inclusive
-  int[] lastToken;    // Document token index, inclusive
+  transient TokenToConstituentIndex t2c_ptb_auto;
+  public TokenToConstituentIndex getT2cPtbAuto() {
+    assert cons_ptb_auto >= 0;
+    if (t2c_ptb_auto == null)
+      t2c_ptb_auto = new TokenToConstituentIndex(this, cons_ptb_auto);
+    return t2c_ptb_auto;
+  }
 
-  // Things below this line need not be saved (can be re-derived)
-  int[] parent;       // Constituent index, -1 for roots
-  int[] rightChild;   // < 0 for leaf nodes
-  int[] leftSib;
-  int[] depth;
+  public TokenToConstituentIndex getT2cPtb(boolean gold) {
+    return gold ? getT2cPtbGold() : getT2cPtbAuto();
+  }
 
+  /* GRAPHS *******************************************************************/
+  // TODO Consider optimizing LabeledDirectedGraph to specially handle trees.
 
-  // The working plan for {@link Situation}s and {@link Entity}s is to put
-  // them in as constituency trees. See the description of how Propbank is
-  // encoded for an example of how this can work. The only issue that may come
-  // up is how to fit all of the needed information into `lhs`. Maybe adding
-  // a field (int or long) would solve the problem. If we need a lot more bits
-  // than that, then I may have to give up on the simplicity of uniform
-  // constituency trees.
+  // See http://nlp.stanford.edu/software/dependencies_manual.pdf
+  LabeledDirectedGraph stanfordDepsBasic;
+  LabeledDirectedGraph stanfordDepsCollapsed;
+  LabeledDirectedGraph stanfordDepsCollapsedCC;
 
-  // TODO Concerning the problem of fitting enough information into `lhs` and
-  // the need for features: I think I'm going to have to add
-  // constituent -> FeatureVector and token -> FeatureVector
-  // mappings.
-
-  /* END OF FIELDS ************************************************************/
+  // See http://universaldependencies.github.io/docs/u/overview/syntax.html
+  LabeledDirectedGraph universalDependencies;
 
 
   /* CONVENIENCE METHODS ******************************************************/
@@ -383,13 +304,6 @@ public final class Document implements Serializable {
   public int getNerH(int tokenIndex) { return nerH[tokenIndex]; }
   public int getSense(int tokenIndex) { return sense[tokenIndex]; }
 
-  public int getConstituentParentIndex(int tokenIndex, ConstituentType consType) {
-    return getConsParent(consType)[tokenIndex];
-  }
-  public Constituent getConstituentParent(int tokenIndex, ConstituentType consType) {
-    return this.new Constituent(getConstituentParentIndex(tokenIndex, consType));
-  }
-
   public boolean isRoot(int constitIndex) {
     assert parent[constitIndex] != UNINITIALIZED;
     return parent[constitIndex] == NONE;
@@ -438,13 +352,6 @@ public final class Document implements Serializable {
     bc1000 = copy(bc1000, numTokens, UNINITIALIZED);
     shape = copy(shape, numTokens, UNINITIALIZED);
     sense = copy(sense, numTokens, UNINITIALIZED);
-
-    cons_parent_ptb_gold = copy(cons_parent_ptb_gold, numTokens, UNINITIALIZED);
-    cons_parent_ptb_auto = copy(cons_parent_ptb_auto, numTokens, UNINITIALIZED);
-    cons_parent_propbank_gold = copy(cons_parent_propbank_gold, numTokens, UNINITIALIZED);
-    cons_parent_propbank_auto = copy(cons_parent_propbank_auto, numTokens, UNINITIALIZED);
-    cons_parent_ner_gold = copy(cons_parent_ner_gold, numTokens, UNINITIALIZED);
-    cons_parent_ner_auto = copy(cons_parent_ner_auto, numTokens, UNINITIALIZED);
   }
 
   /**
@@ -620,17 +527,6 @@ public final class Document implements Serializable {
     public int getBc1000() { return bc1000[index]; }
     public int getShape() { return shape[index]; }
     public int getSense() { return sense[index]; }
-
-    public int getConstituentParentIndex(ConstituentType consType) {
-      return Document.this.getConstituentParentIndex(index, consType);
-    }
-    public Constituent getConstituentParent(ConstituentType consType) {
-      return Document.this.getConstituentParent(index, consType);
-    }
-
-    public void setConstituentParent(int x, ConstituentType consType) {
-      Document.this.getConsParent(consType)[index] = x;
-    }
 
     public void setWord(int x) { word[index] = x; }
     public void setWordNocase(int x) { wordNocase[index] = x; }

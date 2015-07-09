@@ -30,8 +30,10 @@ import edu.jhu.hlt.concrete.Tokenization;
 import edu.jhu.hlt.concrete.UUID;
 import edu.jhu.hlt.tutils.Document.Constituent;
 import edu.jhu.hlt.tutils.Document.ConstituentItr;
-import edu.jhu.hlt.tutils.Document.ConstituentType;
 import edu.jhu.hlt.tutils.Document.Token;
+import edu.jhu.hlt.tutils.data.BrownClusters;
+import edu.jhu.hlt.tutils.data.WordNetPosUtil;
+import edu.jhu.hlt.tutils.ling.Language;
 import edu.mit.jwi.IRAMDictionary;
 import edu.mit.jwi.RAMDictionary;
 import edu.mit.jwi.data.ILoadPolicy;
@@ -90,7 +92,6 @@ public class ConcreteToDocument {
   /** Only supports a single {@link Parse} for now */
   protected String consParseToolName = "conll-2011 parse";
   // TODO allow this to be set set separately
-  protected ConstituentType consParseToolType = ConstituentType.PTB_GOLD;
 
   /**
    * Assumes Propbank SRL is stored as a {@link SituationMention} using
@@ -315,7 +316,6 @@ public class ConcreteToDocument {
    */
   public Constituent addParseConstituents(
       Parse p,
-      ConstituentType consParseToolType,
       int tokenOffset,
       Document doc,
       Map<ConstituentRef, Integer> constituentIndices,
@@ -355,20 +355,6 @@ public class ConcreteToDocument {
       if (ccon2dcon[ccon.getId()] >= 0)
         throw new RuntimeException("loopy parse? " + p);
       ccon2dcon[ccon.getId()] = cons.getIndex();
-
-      if (consParseToolType != null) {
-        // Set parent pointer (for leaf tokens)
-        if (ccon.getChildListSize() == 0) {
-          if (cons.getFirstToken() < 0 || cons.getLastToken() < 0)
-            throw new RuntimeException();
-          int[] cons_parent = doc.getConsParent(consParseToolType);
-          for (int i = cons.getFirstToken(); i <= cons.getLastToken(); i++) {
-            if (cons_parent[i] != Document.UNINITIALIZED)
-              throw new RuntimeException();
-            cons_parent[i] = cons.getIndex();
-          }
-        }
-      }
 
       // Store this Constituents index
       int i = cons.getIndex();
@@ -468,14 +454,6 @@ public class ConcreteToDocument {
       sit.setOnlyChild(pred.getIndex());
       if (debug)
         Log.info("adding Situation text=\"" + sm.getText());
-
-      // Set the parent links (verb token -> propbank cons node)
-      assert pred.getFirstToken() >= 0;
-      assert pred.getLastToken() >= 0;
-      int[] parents = doc.getConsParent(ConstituentType.PROPBANK_GOLD);
-      for (int tokI = pred.getFirstToken(); tokI <= pred.getLastToken(); tokI++) {
-        parents[tokI] = pred.getIndex();
-      }
 
       if (debug) {
         Log.info("pred.firstToken=" + pred.getFirstToken()
@@ -667,7 +645,7 @@ public class ConcreteToDocument {
 
 //        int firstConsTop = doc.consTop;
         Parse parseG = findByTool(tkz.getParseList(), consParseToolName);
-        Constituent rootG = addParseConstituents(parseG, consParseToolType, tokenOffset, doc, constituentIndices, alph);
+        Constituent rootG = addParseConstituents(parseG, tokenOffset, doc, constituentIndices, alph);
         if (doc.cons_ptb_gold == Document.NONE)
           doc.cons_ptb_gold = rootG.getIndex();
         rootG.setParent(Document.NONE);
@@ -680,7 +658,7 @@ public class ConcreteToDocument {
         if (ingestConcreteStanford) {
           // cparse
           Parse parseH = findByPredicate(tkz.getParseList(), STANFORD_CPARSE);
-          Constituent rootH = addParseConstituents(parseH, null, tokenOffset, doc, constituentIndices, alph);
+          Constituent rootH = addParseConstituents(parseH, tokenOffset, doc, constituentIndices, alph);
           if (doc.cons_ptb_auto == Document.NONE)
             doc.cons_ptb_auto = rootH.getIndex();
           rootH.setParent(Document.NONE);
