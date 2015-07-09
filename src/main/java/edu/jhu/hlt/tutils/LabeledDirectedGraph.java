@@ -2,6 +2,7 @@ package edu.jhu.hlt.tutils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -20,6 +21,9 @@ import edu.jhu.hlt.concrete.util.ConcreteException;
 /**
  * Adjacency list style graph representation.
  *
+ * Only allows non-negative node indices for now, so you have to use N as a root
+ * index (where there are N valid tokens which are 0-indexed).
+ *
  * TODO: Add the following
    Shortest path queries:
    - general tool for shortest path given two endpoints: http://en.wikipedia.org/wiki/Bidirectional_search
@@ -35,9 +39,11 @@ import edu.jhu.hlt.concrete.util.ConcreteException;
  *
  * @author travis
  */
-public class LabeledDirectedGraph {
+public class LabeledDirectedGraph implements Serializable {
+  private static final long serialVersionUID = 5303020866316351673L;
 
-  // TODO Represent node->conode vs node<-conode with high order bit in label.
+  public static boolean DEBUG = false;
+
   public static final int EDGE_LABEL_BITS = 16;
   public static final int TOKEN_INDEX_BITS = 24;
 
@@ -138,6 +144,10 @@ public class LabeledDirectedGraph {
       this.numChildren = -1;
     }
 
+    public int getNodeIndex() {
+      return node;
+    }
+
     public String toString() {
       return String.format("<Node %d sp=%d #parent=%d #child=%d>",
           node, split, numParents(), numChildren());
@@ -167,8 +177,8 @@ public class LabeledDirectedGraph {
     public Node getParentNode(int i) {
       long e = getParentEdge(i);
       int n = unpackConode(e);
-      int s = splitPoints[n];
-      return LabeledDirectedGraph.this.new Node(s);
+      System.out.println("[getParentNode] node=" + node + " n=" + n);
+      return LabeledDirectedGraph.this.new Node(n);
     }
 
     /** Returns the node index for the previous state */
@@ -264,6 +274,41 @@ public class LabeledDirectedGraph {
 
       return LabeledDirectedGraph.this;
     }
+
+    /**
+     * Uses 0-indexes for tokens with n as root/wall (where n is the length of the
+     * sentence).
+     * @param n is the length of the sentence/tokenization. Since a dependency
+     * parse need not (necessarily) cover all the tokens, this is required.
+     * @param root must be >= n (and thus >= 0), and is the number used to denote
+     * the root node. Should be greater than any other valid node index.
+     * @param offset is the 0-index of the first token in the {@link DependencyParse}
+     * (concrete uses sentence-specific indexes, this uses document/global indices).
+     */
+    public void addFromConcrete(DependencyParse p, int offset, int n, int root, MultiAlphabet alph) {
+      if (root < 0)
+        throw new IllegalArgumentException();
+      assert n <= root;
+      for (Dependency d : p.getDependencyList()) {
+        int e = alph.dep(d.getEdgeType());
+        int gov = root;
+        if (d.isSetGov() && d.getGov() >= 0) {
+          gov = d.getGov() + offset;
+          assert gov < root;
+          assert d.getGov() < n;
+        } else {
+          gov = root;
+        }
+        int dep = d.getDep() + offset;
+        assert dep < root;
+        assert d.getDep() < n;
+        assert gov >= 0 && dep >= 0;
+//        System.out.println("gov=" + gov + " dep=" + dep + " offset=" + offset
+//            + " n=" + n + " root=" + root
+//            + " gov+offset=" + (gov+offset) + " dep+offset=" + (dep+offset));
+        add(gov, dep, e);
+      }
+    }
   }
 
   public static int[] computeSplitPoints(long[] edges) {
@@ -277,16 +322,18 @@ public class LabeledDirectedGraph {
     int[] splitPoints = new int[numNodes];
     int ptr = 0;
     for (int i = 0; i < numNodes; i++) {
+      if (DEBUG) System.out.println("[computeSplitPoints] i=" + i);
       if (nodes.get(i)) {
         // We have seen this node, so there will be edges for it.
         // Find the first edge where node==i and is node->conode.
-//        System.out.println("looking for node=" + i + " ptr=" + ptr);
+        if (DEBUG)
+          System.out.println("looking for node=" + i + " ptr=" + ptr);
         while (true) {
           long e = edges[ptr];
           int n = unpackNode(e);
-//          int cn = unpackConode(e);
           boolean d = unpackDirection(e);
-//          System.out.println("inspecting ptr=" + ptr + " n=" + n + " cn=" + cn + " d=" + d);
+          if (DEBUG)
+            System.out.println("inspecting ptr=" + ptr + " n=" + n + " cn=" + unpackConode(e) + " d=" + d);
           if (n == i && d)
             break;
           if (n > i) {
@@ -296,42 +343,61 @@ public class LabeledDirectedGraph {
           }
           ptr++;
         }
+        if (DEBUG) System.out.println("[computeSplitPoints] setting splitPoints[" + i +"] = " + ptr);
         splitPoints[i] = ptr;
       } else {
+        if (DEBUG) System.out.println("[computeSplitPoints] setting splitPoints[" + i +"] = -1");
         splitPoints[i] = -1;
       }
     }
+    if (DEBUG) System.out.println("[computeSplitPoints] done");
     return splitPoints;
   }
 
   private static long pack(int node, int edge, int conode, boolean nodeIsParentOfConode) {
+    if (node < 0 || edge < 0 || conode < 0) {
+      throw new IllegalArgumentException("all values must be >=0,"
+          + " node=" + node + " edge=" + edge + " conode=" + conode);
+    }
+
+    boolean debugThis = false;
+
+    if (DEBUG && debugThis) {
+      System.out.println("[pack] node=" + node + " edge=" + edge + " conode=" + conode);
+      System.out.println("[pack] node=" + pad64(node) + " edge=" + pad64(edge) + " conode=" + pad64(conode));
+    }
 
     assert node < (1l << TOKEN_INDEX_BITS);
     assert edge < (1l << (EDGE_LABEL_BITS - 1));    // need one bit for direction
     assert conode < (1l << TOKEN_INDEX_BITS);
 
-    assert node >= 0;
-    assert conode >= 0;
-    assert edge >= 0;
+    assert node >= 0 : "node=" + pad64(node);
+    assert conode >= 0 : "conode=" + pad64(conode);
+    assert edge >= 0 : "edge=" + pad64(edge);
 
     if (nodeIsParentOfConode) {
       assert (edge >> EDGE_LABEL_BITS) == 0;
       edge |= 1l << (EDGE_LABEL_BITS - 1);
     }
 
-//    System.out.println("[p 0] T = " + TOKEN_INDEX_BITS);
-//    System.out.println("[p 0] E = " + EDGE_LABEL_BITS);
+    if (DEBUG && debugThis) {
+      System.out.println("[p 0] T = " + TOKEN_INDEX_BITS);
+      System.out.println("[p 0] E = " + EDGE_LABEL_BITS);
+    }
 
     long p = node;
-//    System.out.println("[p 1] p = " + pad64(p));
-
-//    System.out.println("[p 1] e = " + pad64(edge));
-//    System.out.println("[p 1] n = " + pad64(p << EDGE_LABEL_BITS));
+    if (DEBUG && debugThis) {
+      System.out.println("[p 1] p = " + pad64(p));
+      System.out.println("[p 1] e = " + pad64(edge));
+      System.out.println("[p 1] n = " + pad64(p << EDGE_LABEL_BITS));
+    }
     p = (p << EDGE_LABEL_BITS) | edge;
-//    System.out.println("[p 2] p = " + pad64(p));
+    if (DEBUG && debugThis)
+      System.out.println("[p 2] p = " + pad64(p));
 
     p = (p << TOKEN_INDEX_BITS) | conode;
-//    System.out.println("[p 3] p = " + pad64(p));
+    if (DEBUG && debugThis)
+      System.out.println("[p 3] p = " + pad64(p));
 
     assert p >= 0 : "if negative, there has been an overflow";
     return p;
@@ -339,6 +405,8 @@ public class LabeledDirectedGraph {
 
   public static int unpackNode(long edge) {
     long mask = (1l << TOKEN_INDEX_BITS) - 1;
+//    if (DEBUG)
+//      System.out.println("[unpackNode] edge=" + pad64(edge) + " mask=" + pad64(mask));
     return (int) ((edge >> (EDGE_LABEL_BITS + TOKEN_INDEX_BITS)) & mask);
   }
 
@@ -349,12 +417,30 @@ public class LabeledDirectedGraph {
 
   public static int unpackEdge(long edge) {
     long mask = (1l << (EDGE_LABEL_BITS - 1)) - 1l;
+//    if (DEBUG)
+//      System.out.println("[unpackEdge] edge=" + pad64(edge) + " mask=" + pad64(mask));
     return (int) ((edge >> TOKEN_INDEX_BITS) & mask);
   }
 
   public static int unpackConode(long edge) {
     long mask = (1l << TOKEN_INDEX_BITS) - 1;
+//    if (DEBUG)
+//      System.out.println("[unpackConode] edge=" + pad64(edge) + " mask=" + pad64(mask));
     return (int) (edge & mask);
+  }
+
+  public static int unpackGov(long edge) {
+    if (unpackDirection(edge))
+      return unpackNode(edge);
+    else
+      return unpackConode(edge);
+  }
+
+  public static int unpackDep(long edge) {
+    if (unpackDirection(edge))
+      return unpackConode(edge);
+    else
+      return unpackNode(edge);
   }
 
   /**
@@ -369,8 +455,14 @@ public class LabeledDirectedGraph {
     // TODO warn if p is tree
     for (Dependency d : p.getDependencyList()) {
       int e = alph.dep(d.getEdgeType());
-      int gov = d.isSetGov() ? d.getGov() : n;
-      g.add(gov, d.getDep(), e);
+      int gov = n;
+      if (d.isSetGov() && d.getGov() >= 0) {
+        gov = d.getGov();
+        assert gov < n;
+      }
+      int dep = d.getDep();
+      assert dep < n;
+      g.add(gov, dep, e);
     }
     return g.freeze();
   }
