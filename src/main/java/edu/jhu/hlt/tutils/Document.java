@@ -61,6 +61,7 @@ public final class Document implements Serializable {
   // parse type?
 
   // See http://nlp.stanford.edu/software/dependencies_manual.pdf
+  LabeledDirectedGraph stanfordDepsBasic;
   LabeledDirectedGraph stanfordDepsCollapsed;
   LabeledDirectedGraph stanfordDepsCollapsedCC;
 
@@ -85,17 +86,6 @@ public final class Document implements Serializable {
   int[] shape;
   int[] ner;
   int[] sense;
-
-  // Dependency parse info
-  // NOTE: When this module is expanded to allow multiple dependency parses, we
-  // will need to make this a 2-dimensional array where the first index ranges
-  // over various parsers. This will require adding a DependencyParse view of
-  // a Document which selects one of them.
-  // TODO Crap: Stanford col and colcc dependencies are only guaranteed to be
-  // directed graphs, which can'be be represented this way...
-  int[] dep_parent;   // value is a token index
-  int[] dep_label;    // value is an edge/label type
-
 
   /* Pointers from token -> leaf constituent **********************************/
   // TODO Think about whether these should be kept at all.
@@ -363,8 +353,6 @@ public final class Document implements Serializable {
   public int getShape(int tokenIndex) { return shape[tokenIndex]; }
   public int getNer(int tokenIndex) { return ner[tokenIndex]; }
   public int getSense(int tokenIndex) { return sense[tokenIndex]; }
-  public int getDepParent(int tokenIndex) { return dep_parent[tokenIndex]; }
-  public int getDepLabel(int tokenIndex) { return dep_label[tokenIndex]; }
 
   public int getConstituentParentIndex(int tokenIndex, ConstituentType consType) {
     return getConsParent(consType)[tokenIndex];
@@ -419,9 +407,6 @@ public final class Document implements Serializable {
     shape = copy(shape, numTokens, UNINITIALIZED);
     ner = copy(ner, numTokens, UNINITIALIZED);
     sense = copy(sense, numTokens, UNINITIALIZED);
-
-    dep_parent = copy(dep_parent, numTokens, UNINITIALIZED);
-    dep_label = copy(dep_label, numTokens, UNINITIALIZED);
 
     cons_parent_ptb_gold = copy(cons_parent_ptb_gold, numTokens, UNINITIALIZED);
     cons_parent_ptb_auto = copy(cons_parent_ptb_auto, numTokens, UNINITIALIZED);
@@ -593,8 +578,6 @@ public final class Document implements Serializable {
     public int getShape() { return shape[index]; }
     public int getNer() { return ner[index]; }
     public int getSense() { return sense[index]; }
-    public int getDepParent() { return dep_parent[index]; }
-    public int getDepLabel() { return dep_label[index]; }
 
     public int getConstituentParentIndex(ConstituentType consType) {
       return Document.this.getConstituentParentIndex(index, consType);
@@ -617,8 +600,6 @@ public final class Document implements Serializable {
     public void setShape(int x) { shape[index] = x; }
     public void setNer(int x) { ner[index] = x; }
     public void setSense(int x) { sense[index] = x; }
-    public void setDepParent(int x) { dep_parent[index] = x; }
-    public void setDepLabel(int x) { dep_label[index] = x; }
 
     @Override
     public String show(MultiAlphabet alph) {
