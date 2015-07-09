@@ -64,5 +64,12 @@ public class LossAugmentedParams<S, A> implements Params<S, A> {
       if (includeLoss)
         loss.backwards(dErr_dForwards);
     }
+
+    @Override
+    public String toString() {
+      if (includeLoss)
+        return ("(LossAugmented " + modelScore + " + " + loss + ")");
+      return ("(LossAugmented " + modelScore + " without deltaLoss)");
+    }
   }
 }
