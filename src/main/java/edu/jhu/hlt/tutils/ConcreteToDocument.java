@@ -3,14 +3,17 @@ package edu.jhu.hlt.tutils;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import edu.jhu.hlt.concrete.AnnotationMetadata;
 import edu.jhu.hlt.concrete.Communication;
 import edu.jhu.hlt.concrete.ConstituentRef;
+import edu.jhu.hlt.concrete.DependencyParse;
 import edu.jhu.hlt.concrete.Entity;
 import edu.jhu.hlt.concrete.EntityMention;
 import edu.jhu.hlt.concrete.EntityMentionSet;
@@ -48,6 +51,33 @@ import edu.mit.jwi.item.IWordID;
  */
 public class ConcreteToDocument {
 
+  public static final Predicate<TokenTagging> STANFORD_POS = tt -> {
+    return "Stanford CoreNLP".equals(tt.getMetadata().getTool())
+        && "POS".equals(tt.getTaggingType());
+  };
+  public static final Predicate<TokenTagging> STANFORD_NER = tt -> {
+    return "Stanford CoreNLP".equals(tt.getMetadata().getTool())
+        && "NER".equals(tt.getTaggingType());
+  };
+  public static final Predicate<TokenTagging> STANFORD_LEMMA = tt -> {
+    return "Stanford CoreNLP".equals(tt.getMetadata().getTool())
+        && "LEMMA".equals(tt.getTaggingType());
+  };
+  public static final Predicate<Parse> STANFORD_CPARSE = p -> {
+    return "Stanford CoreNLP".equals(p.getMetadata().getTool());
+  };
+  public static final Predicate<DependencyParse> STANFORD_DPARSE_BASIC = p -> {
+    return "Stanford CoreNLP basic".equals(p.getMetadata().getTool());
+  };
+  public static final Predicate<DependencyParse> STANFORD_DPARSE_COLL = p -> {
+    return "Stanford CoreNLP col".equals(p.getMetadata().getTool());
+  };
+  public static final Predicate<DependencyParse> STANFORD_DPARSE_COLL_CC = p -> {
+    return "Stanford CoreNLP col-CC".equals(p.getMetadata().getTool());
+  };
+  // TODO coref{ems,es}
+
+
   public boolean debug = false;
   public boolean debug_cons = false;
 
@@ -74,6 +104,10 @@ public class ConcreteToDocument {
    * {@link Document#cons_coref_gold}.
    */
   protected String entitySetToolName = null;
+
+  // If true, look for concrete-stanford pos, ner, lemma, cparse, dparse{1,2,3},
+  // coref and put them into stanford-specific fields in Document.
+  public boolean ingestConcreteStanford = false;
 
   protected BrownClusters bc256, bc1000;
   protected IRAMDictionary wnDict;
@@ -123,18 +157,27 @@ public class ConcreteToDocument {
       Document.Token token,
       Communication c,
       Tokenization t,
-      TokenTagging pos,
-      TokenTagging ner,
+      TokenTagging lemma,
+      TokenTagging posG,
+      TokenTagging posH,
+      TokenTagging nerG,
+      TokenTagging nerH,
       int tokenIdx,
       MultiAlphabet alph) {
     edu.jhu.hlt.concrete.Token ct = t.getTokenList().getTokenList().get(tokenIdx);
     assert ct.isSetText();
     String w = ct.getText();
     token.setWord(alph.word(w));
-    if (pos != null)
-      token.setPos(alph.pos(pos.getTaggedTokenList().get(tokenIdx).getTag()));
-    if (ner != null)
-      token.setNer(alph.ner(ner.getTaggedTokenList().get(tokenIdx).getTag()));
+    if (lemma != null)
+      token.setLemma(alph.word(lemma.getTaggedTokenList().get(tokenIdx).getTag()));
+    if (posG != null)
+      token.setPosG(alph.pos(posG.getTaggedTokenList().get(tokenIdx).getTag()));
+    if (posH != null)
+      token.setPosH(alph.pos(posH.getTaggedTokenList().get(tokenIdx).getTag()));
+    if (nerG != null)
+      token.setNerG(alph.ner(nerG.getTaggedTokenList().get(tokenIdx).getTag()));
+    if (nerH != null)
+      token.setNerH(alph.ner(nerH.getTaggedTokenList().get(tokenIdx).getTag()));
 
     if (lang.isRoman()) {
       token.setWordNocase(alph.word(w.toLowerCase()));
@@ -142,7 +185,7 @@ public class ConcreteToDocument {
     }
 
     // WordNet synset id
-    if (wnDict != null && pos != null && lang == Language.EN) {
+    if (wnDict != null && posG != null && lang == Language.EN) {
       token.setWnSynset(alph.wnSynset(MultiAlphabet.UNKNOWN));
       edu.mit.jwi.item.POS wnPos = WordNetPosUtil.ptb2wordNet(token.getPosStr());
       if (wnPos != null) {
@@ -272,10 +315,16 @@ public class ConcreteToDocument {
    */
   public Constituent addParseConstituents(
       Parse p,
+      ConstituentType consParseToolType,
       int tokenOffset,
       Document doc,
       Map<ConstituentRef, Integer> constituentIndices,
       MultiAlphabet alph) {
+
+    // Sanity check: Constituents shouldn't really have ids, they should work
+    // only on indices.
+    for (int i = 0; i < p.getConstituentListSize(); i++)
+      assert i == p.getConstituentList().get(i).getId();
 
     BitSet isNotChild = new BitSet();   // constituent indices
     int adds = 0;
@@ -283,6 +332,7 @@ public class ConcreteToDocument {
     // Build the constituents and mapping between them
     int nCons = p.getConstituentListSize();
     int[] ccon2dcon = new int[nCons];
+    Arrays.fill(ccon2dcon, -1);
     int pl = 0; // index into parse.constituentList
     for (edu.jhu.hlt.concrete.Constituent ccon : p.getConstituentList()) {
       if (debug_cons)
@@ -301,17 +351,22 @@ public class ConcreteToDocument {
         cons.setFirstToken(tokenOffset + ccon.getStart());
         cons.setLastToken(tokenOffset + ccon.getEnding() - 1);
       }
+      assert cons.getIndex() >= 0;
+      if (ccon2dcon[ccon.getId()] >= 0)
+        throw new RuntimeException("loopy parse? " + p);
       ccon2dcon[ccon.getId()] = cons.getIndex();
 
-      // Set parent pointer (for leaf tokens)
-      if (ccon.getChildListSize() == 0) {
-        if (cons.getFirstToken() < 0 || cons.getLastToken() < 0)
-          throw new RuntimeException();
-        int[] cons_parent = doc.getConsParent(consParseToolType);
-        for (int i = cons.getFirstToken(); i <= cons.getLastToken(); i++) {
-          if (cons_parent[i] != Document.UNINITIALIZED)
+      if (consParseToolType != null) {
+        // Set parent pointer (for leaf tokens)
+        if (ccon.getChildListSize() == 0) {
+          if (cons.getFirstToken() < 0 || cons.getLastToken() < 0)
             throw new RuntimeException();
-          cons_parent[i] = cons.getIndex();
+          int[] cons_parent = doc.getConsParent(consParseToolType);
+          for (int i = cons.getFirstToken(); i <= cons.getLastToken(); i++) {
+            if (cons_parent[i] != Document.UNINITIALIZED)
+              throw new RuntimeException();
+            cons_parent[i] = cons.getIndex();
+          }
         }
       }
 
@@ -556,52 +611,121 @@ public class ConcreteToDocument {
     addParagraphs(c, doc);
 
     // Build the Document
-    DocumentTester test = new DocumentTester(doc, true);
+//    DocumentTester test = new DocumentTester(doc, true);
     int tokenOffset = 0;
     Map<ConstituentRef, Integer> constituentIndices = new HashMap<>();
-    int prevParse = Document.NONE;
+    int prevParseG = Document.NONE;
+    int prevParseH = Document.NONE;
+    LabeledDirectedGraph.Builder dparseBasic = new LabeledDirectedGraph().new Builder();
+    LabeledDirectedGraph.Builder dparseColl = new LabeledDirectedGraph().new Builder();
+    LabeledDirectedGraph.Builder dparseCollCC = new LabeledDirectedGraph().new Builder();
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
 
         Tokenization tkz = ss.getTokenization();
 
-        TokenTagging pos = null;
+        if (debug) {
+          System.out.println();
+          System.out.println("ingestConcreteStanford=" + ingestConcreteStanford);
+          for (TokenTagging tt : tkz.getTokenTaggingList()) {
+            System.out.println("tokOffset=" + tokenOffset
+                + " TokenTagging type=" + tt.getTaggingType()
+                + " tool=" + tt.getMetadata().getTool());
+          }
+          for (Parse p : tkz.getParseList()) {
+            System.out.println("tokOffset=" + tokenOffset
+                + " CParse tool=" + p.getMetadata().getTool());
+          }
+          for (DependencyParse dp : tkz.getDependencyParseList()) {
+            System.out.println("tokOffset=" + tokenOffset
+                + " DParse tool=" + dp.getMetadata().getTool());
+          }
+        }
+
+        TokenTagging posG = null;
         if (posToolName != null)
-          pos = findByTool(tkz.getTokenTaggingList(), posToolName);
-        TokenTagging ner = null;
+          posG = findByTool(tkz.getTokenTaggingList(), posToolName);
+        TokenTagging nerG = null;
         if (nerToolName != null)
           findByTool(tkz.getTokenTaggingList(), nerToolName);
+        TokenTagging lemma = null;
+        TokenTagging posH = null, nerH = null;
+        if (ingestConcreteStanford) {
+          lemma = findByPredicate(tkz.getTokenTaggingList(), STANFORD_LEMMA);
+          posH = findByPredicate(tkz.getTokenTaggingList(), STANFORD_POS);
+          nerH = findByPredicate(tkz.getTokenTaggingList(), STANFORD_NER);
+        }
 
         int n = tkz.getTokenList().getTokenListSize();
         for (int i = 0; i < n; i++) {
           Token token = doc.newToken();
-          setToken(token, c, tkz, pos, ner, i, alph);
+          setToken(token, c, tkz, lemma, posG, posH, nerG, nerH, i, alph);
           if (debug) {
             Log.info("just set token[" + token.getIndex() + "]=" + token.getWordStr());
           }
         }
 
-        Parse p = findByTool(tkz.getParseList(), consParseToolName);
-        Constituent root = addParseConstituents(p, tokenOffset, doc, constituentIndices, alph);
+//        int firstConsTop = doc.consTop;
+        Parse parseG = findByTool(tkz.getParseList(), consParseToolName);
+        Constituent rootG = addParseConstituents(parseG, consParseToolType, tokenOffset, doc, constituentIndices, alph);
         if (doc.cons_ptb_gold == Document.NONE)
-          doc.cons_ptb_gold = root.getIndex();
-        root.setParent(Document.NONE);
-        root.setLeftSib(prevParse);
-        root.setRightSib(Document.NONE);
-        if (prevParse != Document.NONE)
-          doc.getConstituent(prevParse).setRightSib(root.getIndex());
-        prevParse = root.getIndex();
+          doc.cons_ptb_gold = rootG.getIndex();
+        rootG.setParent(Document.NONE);
+        rootG.setLeftSib(prevParseG);
+        rootG.setRightSib(Document.NONE);
+        if (prevParseG != Document.NONE)
+          doc.getConstituent(prevParseG).setRightSib(rootG.getIndex());
+        prevParseG = rootG.getIndex();
+
+        if (ingestConcreteStanford) {
+          // cparse
+          Parse parseH = findByPredicate(tkz.getParseList(), STANFORD_CPARSE);
+          Constituent rootH = addParseConstituents(parseH, null, tokenOffset, doc, constituentIndices, alph);
+          if (doc.cons_ptb_auto == Document.NONE)
+            doc.cons_ptb_auto = rootH.getIndex();
+          rootH.setParent(Document.NONE);
+          rootH.setLeftSib(prevParseH);
+          rootH.setRightSib(Document.NONE);
+          if (prevParseH != Document.NONE)
+            doc.getConstituent(prevParseH).setRightSib(rootH.getIndex());
+          prevParseH = rootH.getIndex();
+
+          // dparse(s)
+          // Uses numToks (count for the document) as the root index in these
+          // dep trees. This is a requirement due to not being able to bit-pack
+          // negative numbers (LabeledDirectedGraph limitation).
+          assert numToks > 0;
+          dparseBasic.addFromConcrete(
+              findByPredicate(tkz.getDependencyParseList(), STANFORD_DPARSE_BASIC),
+              tokenOffset, n, numToks, alph);
+          dparseColl.addFromConcrete(
+              findByPredicate(tkz.getDependencyParseList(), STANFORD_DPARSE_COLL),
+              tokenOffset, n, numToks, alph);
+          dparseCollCC.addFromConcrete(
+              findByPredicate(tkz.getDependencyParseList(), STANFORD_DPARSE_COLL_CC),
+              tokenOffset, n, numToks, alph);
+        }
+
         tokenOffset += n;
       }
     }
 
-    // Compute some derived values in Document
+    if (ingestConcreteStanford) {
+      if (debug)
+        Log.info("freezing/adding stanford dependency parses, numToks=" + numToks);
+      doc.stanfordDepsBasic = dparseBasic.freeze();
+      doc.stanfordDepsCollapsed = dparseColl.freeze();
+      doc.stanfordDepsCollapsedCC = dparseCollCC.freeze();
+    }
+
     doc.computeDepths();
 
 //    assert test.firstAndLastTokensValid();
 
     // Add Propbank SRL
     if (this.propbankSrlToolName != null) {
+      if (debug)
+        Log.info("adding propbank");
       Constituent propbankSrl = addPropbankSrl(c, this.propbankSrlToolName,
           constituentIndices, mapping, alph);
       if (propbankSrl == null)
@@ -778,6 +902,17 @@ public class ConcreteToDocument {
           + " [" + items.get(0).getClass() + "]");
     }
     return match;
+  }
+
+  public static <T> T findByPredicate(List<T> items, Predicate<T> p) {
+    List<T> possible = new ArrayList<>();
+    for (T t : items) {
+      if (p.test(t))
+        possible.add(t);
+    }
+    if (possible.size() != 1)
+      throw new RuntimeException("not exactly one match: " + possible);
+    return possible.get(0);
   }
 
   public static <T> Map<UUID, T> indexByUUID(List<T> items) {

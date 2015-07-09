@@ -48,7 +48,7 @@ public final class Document implements Serializable {
   // A note on graphs:
   // One goal was to be able to have a Token which is just an index into the
   // document and be able to do a multi-graph traversal from just that int.
-  // Constituency trees force use to have another type of index due to the
+  // Constituency trees force the user to have another type of index due to the
   // non-token-indexedness of constituents, but graphs go one step further
   // due to the unknown number of parents. I may try to fold in the adjacency
   // list style representation used in LabeledDirectedGraph into Document to be
@@ -78,17 +78,29 @@ public final class Document implements Serializable {
 
   int[] word;
   int[] wordNocase;
-  int[] pos;
+  int[] posG;         // gold
+  int[] posH;         // hypothesis
+  int[] nerG;         // gold
+  int[] nerH;         // hypothesis
   int[] lemma;
   int[] wnSynset;
   int[] bc256;
   int[] bc1000;
   int[] shape;
-  int[] ner;
   int[] sense;
 
   /* Pointers from token -> leaf constituent **********************************/
   // TODO Think about whether these should be kept at all.
+  /*
+   * NOTE: These should be removed: they are just an index on info that is already
+   * in the constituency trees. Namely, those trees have first/last token. The
+   * correct way to do this is to have an index object which basically builds
+   * these data structures (or maybe more efficient ones) from the trees for
+   * querying, but which can be thrown away at any time.
+   * This has the nice benefit of not needing an extra value for every token
+   * PER TOOL; how I did constituents scales down nicely to not take space when
+   * not all tools are used.
+   */
 
   // The index of a constituency tree node immediately dominated by this token.
   // May be -1 for constituency trees that don't cover the entire span.
@@ -163,8 +175,8 @@ public final class Document implements Serializable {
   public int cons_section = NONE;
 
   // top level is linked list of cparses for sentences
-  public int cons_ptb_gold = NONE;
-  public int cons_ptb_auto = NONE;
+  public int cons_ptb_gold = NONE;    // e.g. CoNLL/PTB gold parse
+  public int cons_ptb_auto = NONE;    // e.g. Stanford cparse
 
   // top level is linked list of items like (PROP ... (ARG ...) (ARG ...) ...)
   // See above for note about handling Propbank continuation roles, etc.
@@ -174,6 +186,7 @@ public final class Document implements Serializable {
   // top level is linked list of (NER lhs=type firstToken=i lastToken=j)
   public int cons_ner_gold = NONE;
   public int cons_ner_auto = NONE;
+  // TODO NER is currently tokens... make this into cons
 
   // Linked list (use rightSib) of mentions for coref
   public int cons_coref_mention_gold = NONE;
@@ -329,29 +342,45 @@ public final class Document implements Serializable {
    */
   public void computeDepths() {
     assert depth.length == parent.length;
-    for (int c = 0; c < depth.length; c++) {
+    assert consTop <= parent.length;
+    for (int c = 0; c < consTop; c++) {
       int depth = 0;
       int ptr = c;
       while (ptr >= 0) {
         depth++;
         ptr = parent[ptr];
+        if (depth > this.depth.length) {
+          System.out.println("loop:");
+          BitSet bs = new BitSet();
+          while (true) {
+            System.out.println(ptr);
+            if (bs.get(ptr))
+              break;
+            bs.set(ptr);
+            ptr = parent[ptr];
+          }
+          throw new RuntimeException("you have a loop in your constituency "
+              + "graph above leaf node " + c + "!");
+        }
       }
       this.depth[c] = depth;
     }
   }
 
   public String getWordStr(int tokenIndex) { return alph.word(word[tokenIndex]); }
-  public String getPosStr(int tokenIndex) { return alph.pos(pos[tokenIndex]); }
+  public String getPosStr(int tokenIndex) { return alph.pos(posG[tokenIndex]); }
 
   public int getWord(int tokenIndex) { return word[tokenIndex]; }
   public int getWordNocase(int tokenIndex) { return wordNocase[tokenIndex]; }
-  public int getPos(int tokenIndex) { return pos[tokenIndex]; }
+  public int getPosG(int tokenIndex) { return posG[tokenIndex]; }
+  public int getPosH(int tokenIndex) { return posH[tokenIndex]; }
   public int getLemma(int tokenIndex) { return lemma[tokenIndex]; }
   public int getWnSynset(int tokenIndex) { return wnSynset[tokenIndex]; }
   public int getBc256(int tokenIndex) { return bc256[tokenIndex]; }
   public int getBc1000(int tokenIndex) { return bc1000[tokenIndex]; }
   public int getShape(int tokenIndex) { return shape[tokenIndex]; }
-  public int getNer(int tokenIndex) { return ner[tokenIndex]; }
+  public int getNerG(int tokenIndex) { return nerG[tokenIndex]; }
+  public int getNerH(int tokenIndex) { return nerH[tokenIndex]; }
   public int getSense(int tokenIndex) { return sense[tokenIndex]; }
 
   public int getConstituentParentIndex(int tokenIndex, ConstituentType consType) {
@@ -399,13 +428,15 @@ public final class Document implements Serializable {
 
     word = copy(word, numTokens, UNINITIALIZED);
     wordNocase = copy(wordNocase, numTokens, UNINITIALIZED);
-    pos = copy(pos, numTokens, UNINITIALIZED);
+    posG = copy(posG, numTokens, UNINITIALIZED);
+    posH = copy(posH, numTokens, UNINITIALIZED);
+    nerG = copy(nerG, numTokens, UNINITIALIZED);
+    nerH = copy(nerH, numTokens, UNINITIALIZED);
     lemma = copy(lemma, numTokens, UNINITIALIZED);
     wnSynset = copy(wnSynset, numTokens, UNINITIALIZED);
     bc256 = copy(bc256, numTokens, UNINITIALIZED);
     bc1000 = copy(bc1000, numTokens, UNINITIALIZED);
     shape = copy(shape, numTokens, UNINITIALIZED);
-    ner = copy(ner, numTokens, UNINITIALIZED);
     sense = copy(sense, numTokens, UNINITIALIZED);
 
     cons_parent_ptb_gold = copy(cons_parent_ptb_gold, numTokens, UNINITIALIZED);
@@ -556,27 +587,38 @@ public final class Document implements Serializable {
   /** Pointer to a token */
   public class Token extends Slice {
     protected int index;
+    protected boolean goldView;   // true => posG, nerG  false => posH, nerH
+
     public Token(int index) {
+      this(index, false);
+    }
+
+    public Token(int index, boolean goldView) {
       super(index, 1);
       if (index == UNINITIALIZED)
         throw new IllegalArgumentException();
       this.index = index;
+      this.goldView = goldView;
     }
 
     /** Use sparingly: Not always obvious which alph sub-section to use. */
     public String getWordStr() { return alph.word(word[index]); }
-    public String getPosStr() { return alph.pos(pos[index]); }
+    public String getPosStr() { return alph.pos(posG[index]); }
 
     public int getIndex() { return index; }
     public int getWord() { return word[index]; }
     public int getWordNocase() { return wordNocase[index]; }
-    public int getPos() { return pos[index]; }
+    public int getPos() { return goldView ? posG[index] : posH[index]; }
+    public int getPosG() { return posG[index]; }
+    public int getPosH() { return posH[index]; }
+    public int getNer() { return goldView ? nerG[index] : nerH[index]; }
+    public int getNerG() { return nerG[index]; }
+    public int getNerH() { return nerH[index]; }
     public int getLemma() { return lemma[index]; }
     public int getWnSynset() { return wnSynset[index]; }
     public int getBc256() { return bc256[index]; }
     public int getBc1000() { return bc1000[index]; }
     public int getShape() { return shape[index]; }
-    public int getNer() { return ner[index]; }
     public int getSense() { return sense[index]; }
 
     public int getConstituentParentIndex(ConstituentType consType) {
@@ -592,13 +634,15 @@ public final class Document implements Serializable {
 
     public void setWord(int x) { word[index] = x; }
     public void setWordNocase(int x) { wordNocase[index] = x; }
-    public void setPos(int x) { pos[index] = x; }
+    public void setPosG(int x) { posG[index] = x; }
+    public void setPosH(int x) { posH[index] = x; }
     public void setLemma(int x) { lemma[index] = x; }
     public void setWnSynset(int x) { wnSynset[index] = x; }
     public void setBc256(int x) { bc256[index] = x; }
     public void setBc1000(int x) { bc1000[index] = x; }
     public void setShape(int x) { shape[index] = x; }
-    public void setNer(int x) { ner[index] = x; }
+    public void setNerG(int x) { nerG[index] = x; }
+    public void setNerH(int x) { nerH[index] = x; }
     public void setSense(int x) { sense[index] = x; }
 
     @Override
