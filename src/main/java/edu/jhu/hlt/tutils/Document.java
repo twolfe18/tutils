@@ -146,12 +146,12 @@ public final class Document implements Serializable {
   // TODO Consider optimizing LabeledDirectedGraph to specially handle trees.
 
   // See http://nlp.stanford.edu/software/dependencies_manual.pdf
-  LabeledDirectedGraph stanfordDepsBasic;
-  LabeledDirectedGraph stanfordDepsCollapsed;
-  LabeledDirectedGraph stanfordDepsCollapsedCC;
+  public LabeledDirectedGraph stanfordDepsBasic;
+  public LabeledDirectedGraph stanfordDepsCollapsed;
+  public LabeledDirectedGraph stanfordDepsCollapsedCC;
 
   // See http://universaldependencies.github.io/docs/u/overview/syntax.html
-  LabeledDirectedGraph universalDependencies;
+  public LabeledDirectedGraph universalDependencies;
 
 
   /* CONVENIENCE METHODS ******************************************************/

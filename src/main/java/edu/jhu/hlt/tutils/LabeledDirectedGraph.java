@@ -174,10 +174,15 @@ public class LabeledDirectedGraph implements Serializable {
       return edges[split - (i + 1)];
     }
 
+    public int getParent(int i) {
+      long e = getParentEdge(i);
+      int n = unpackConode(e);
+      return n;
+    }
+
     public Node getParentNode(int i) {
       long e = getParentEdge(i);
       int n = unpackConode(e);
-      System.out.println("[getParentNode] node=" + node + " n=" + n);
       return LabeledDirectedGraph.this.new Node(n);
     }
 
@@ -213,11 +218,16 @@ public class LabeledDirectedGraph implements Serializable {
       return edges[split + i];
     }
 
+    public int getChild(int i) {
+      long e = getChildEdge(i);
+      int n = unpackConode(e);
+      return n;
+    }
+
     public Node getChildNode(int i) {
       long e = getChildEdge(i);
       int n = unpackConode(e);
-      int s = splitPoints[n];
-      return LabeledDirectedGraph.this.new Node(s);
+      return LabeledDirectedGraph.this.new Node(n);
     }
 
     /** Returns the node index for the previous state */

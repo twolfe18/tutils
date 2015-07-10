@@ -625,7 +625,7 @@ public class ConcreteToDocument {
           posG = findByTool(tkz.getTokenTaggingList(), posToolName);
         TokenTagging nerG = null;
         if (nerToolName != null)
-          findByTool(tkz.getTokenTaggingList(), nerToolName);
+          nerG = findByTool(tkz.getTokenTaggingList(), nerToolName);
         TokenTagging lemma = null;
         TokenTagging posH = null, nerH = null;
         if (ingestConcreteStanford) {
