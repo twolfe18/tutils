@@ -8,7 +8,9 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntConsumer;
 import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 
 import edu.jhu.hlt.concrete.AnnotationMetadata;
 import edu.jhu.hlt.concrete.Communication;
@@ -77,7 +79,9 @@ public class ConcreteToDocument {
   public static final Predicate<DependencyParse> STANFORD_DPARSE_COLL_CC = p -> {
     return "Stanford CoreNLP col-CC".equals(p.getMetadata().getTool());
   };
-  // TODO coref{ems,es}
+  public static final Predicate<EntitySet> STANFORD_COREF = es -> {
+    return "Stanford Coref".equals(es.getMetadata().getTool());
+  };
 
 
   public boolean debug = false;
@@ -153,6 +157,33 @@ public class ConcreteToDocument {
     this.entitySetToolName = toolName;
   }
 
+
+  public static void setTokenHelper(IntConsumer tokSet, ToIntFunction<String> alph, TokenTagging tags, int i, Tokenization toks) {
+    int n = toks.getTokenList().getTokenListSize();
+    if (tags == null)
+      return;
+    if (tags.getTaggedTokenListSize() == 0) {
+      if (i == 0) {   // Only print this once per sentence
+        Log.warn("zero length TokenTagging! " + tags.getMetadata()
+            + " " + tags.getTaggingType() + " in " + toks.getUuid());
+      }
+      return;
+    }
+    if (tags.getTaggedTokenListSize() != n) {
+      Log.warn("inappropriate size: " + tags.getTaggedTokenListSize() + " vs " + n + " in " + toks.getUuid());
+      System.err.println(toks.getMetadata());
+      for (edu.jhu.hlt.concrete.Token t : toks.getTokenList().getTokenList())
+        System.err.println(t);
+      System.err.println(tags.getMetadata());
+      for (edu.jhu.hlt.concrete.TaggedToken t : tags.getTaggedTokenList())
+        System.err.println(t);
+      throw new RuntimeException("i=" + i);
+    }
+    String s = tags.getTaggedTokenList().get(i).getTag();
+    int v = alph.applyAsInt(s);
+    tokSet.accept(v);
+  }
+
   /** Returns a Token with word, pos, and ner initialized */
   public void setToken(
       Document.Token token,
@@ -169,16 +200,12 @@ public class ConcreteToDocument {
     assert ct.isSetText();
     String w = ct.getText();
     token.setWord(alph.word(w));
-    if (lemma != null)
-      token.setLemma(alph.word(lemma.getTaggedTokenList().get(tokenIdx).getTag()));
-    if (posG != null)
-      token.setPosG(alph.pos(posG.getTaggedTokenList().get(tokenIdx).getTag()));
-    if (posH != null)
-      token.setPosH(alph.pos(posH.getTaggedTokenList().get(tokenIdx).getTag()));
-    if (nerG != null)
-      token.setNerG(alph.ner(nerG.getTaggedTokenList().get(tokenIdx).getTag()));
-    if (nerH != null)
-      token.setNerH(alph.ner(nerH.getTaggedTokenList().get(tokenIdx).getTag()));
+
+    setTokenHelper(token::setLemma, alph::word, lemma, tokenIdx, t);
+    setTokenHelper(token::setPosG, alph::pos, posG, tokenIdx, t);
+    setTokenHelper(token::setPosH, alph::pos, posH, tokenIdx, t);
+    setTokenHelper(token::setNerG, alph::ner, nerG, tokenIdx, t);
+    setTokenHelper(token::setNerH, alph::ner, nerH, tokenIdx, t);
 
     if (lang.isRoman()) {
       token.setWordNocase(alph.word(w.toLowerCase()));
@@ -190,7 +217,7 @@ public class ConcreteToDocument {
       token.setWnSynset(alph.wnSynset(MultiAlphabet.UNKNOWN));
       edu.mit.jwi.item.POS wnPos = WordNetPosUtil.ptb2wordNet(token.getPosStr());
       if (wnPos != null) {
-        String wd = token.getWordStr();
+        String wd = token.getLemma() >= 0 ? alph.word(token.getLemma()) : token.getWordStr();
         IIndexWord wnWord = wnDict.getIndexWord(wd, wnPos);
         if (wnWord != null) {
           IWordID wnWordId = wnWord.getWordIDs().get(0);
@@ -725,6 +752,17 @@ public class ConcreteToDocument {
         throw new RuntimeException("emtpy EntitySet? " + es.getUuid());
       else
         doc.cons_coref_gold = coref.getIndex();
+    }
+    if (ingestConcreteStanford) {
+      EntitySet es = findByPredicate(c.getEntitySetList(), STANFORD_COREF);
+      if (!es.isSetMentionSetId())
+        throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
+      EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
+      Constituent coref = addCorefConstituents(es, ems, doc, mapping, alph);
+      if (coref == null)
+        throw new RuntimeException("emtpy EntitySet? " + es.getUuid());
+      else
+        doc.cons_coref_auto = coref.getIndex();
     }
 
     // Compute BrownClusters
