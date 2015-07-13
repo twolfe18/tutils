@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.ToIntFunction;
 
+import edu.jhu.hlt.tutils.ling.Language;
+
 /**
  * More or less the CoNLL format in memory, with some other influences which
  * keep things very tabular.
@@ -37,8 +39,9 @@ public final class Document implements Serializable {
   public static boolean LOG_ALLOCATIONS = false;
 
   /* GENERAL FIELDS ***********************************************************/
-  final String id;
-  int index;
+  public Language language;
+  public final String id;
+  public int index;
   private transient MultiAlphabet alph;
 
   // Whether the forwards method should allow constituent fields to be re-allocated
@@ -86,9 +89,9 @@ public final class Document implements Serializable {
   /* LINKED LISTS OF CONSTITUENTS *********************************************/
 
   // index of constituent corresponding to the first sentence
-  public int cons_sentences = NONE;
-  public int cons_paragraph = NONE;
-  public int cons_section = NONE;
+  public int cons_sentences = NONE;     // lhs = sentence index
+  public int cons_paragraph = NONE;     // lhs = paragraph index
+  public int cons_section = NONE;       // lhs = section index
 
   // top level is linked list of cparses for sentences
   public int cons_ptb_gold = NONE;    // e.g. CoNLL/PTB gold parse
@@ -140,6 +143,14 @@ public final class Document implements Serializable {
 
   public TokenToConstituentIndex getT2cPtb(boolean gold) {
     return gold ? getT2cPtbGold() : getT2cPtbAuto();
+  }
+
+  transient TokenToConstituentIndex t2c_sentence;
+  public TokenToConstituentIndex getT2cSentence() {
+    assert cons_sentences >= 0;
+    if (t2c_sentence == null)
+      t2c_sentence = new TokenToConstituentIndex(this, cons_sentences);
+    return t2c_sentence;
   }
 
   /* GRAPHS *******************************************************************/
