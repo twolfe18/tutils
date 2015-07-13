@@ -81,4 +81,24 @@ public class DocumentTester {
 
     return good;
   }
+
+  public boolean checkWords() {
+    boolean good = true;
+    MultiAlphabet alph = doc.getAlphabet();
+    int Nw = alph.numWord();
+    for (int i = 0; i < doc.tokTop; i++) {
+      int w = doc.getWord(i);
+      if (w == Document.UNINITIALIZED) {
+        good = false;
+        if (printErrorMessages)
+          System.err.println("unititialized word: i=" + i + " tokTop=" + doc.tokTop);
+      }
+      if (w >= Nw) {
+        good = false;
+        if (printErrorMessages)
+          System.err.println("mis-indexed word: i=" + i + " word=" + w + " alph.numWords=" + Nw);
+      }
+    }
+    return good;
+  }
 }
