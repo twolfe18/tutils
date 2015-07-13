@@ -138,6 +138,12 @@ public class LabeledDirectedGraph implements Serializable {
     private int numChildren;
 
     public Node(int nodeIndex) {
+      if (nodeIndex >= splitPoints.length) {
+        throw new RuntimeException("either this graph was constructed "
+            + "improperly (likely if there are no edges) or nodeIndex="
+            + nodeIndex + " is illegal, splitPoints.length="
+            + splitPoints.length + " edges.length=" + edges.length);
+      }
       this.node = nodeIndex;
       this.split = splitPoints[nodeIndex];
       this.numParents = -1;
@@ -266,6 +272,10 @@ public class LabeledDirectedGraph implements Serializable {
       edges[top++] = pack(child, edgeLabel, parent, false);
     }
 
+    public int numEdges() {
+      return top;
+    }
+
     public LabeledDirectedGraph freeze() {
       // Truncate the edge array
       long[] trunc = new long[top];
@@ -296,6 +306,8 @@ public class LabeledDirectedGraph implements Serializable {
      * (concrete uses sentence-specific indexes, this uses document/global indices).
      */
     public void addFromConcrete(DependencyParse p, int offset, int n, int root, MultiAlphabet alph) {
+      if (p == null)
+        return;
       if (root < 0)
         throw new IllegalArgumentException();
       assert n <= root;
