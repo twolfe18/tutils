@@ -29,6 +29,10 @@ public class MultiTimer {
       firstStart = System.currentTimeMillis();
   }
 
+  public Timer put(String key, Timer t) {
+    return timers.put(key, t);
+  }
+
   /** returns the time taken between the last start/stop pair for this key */
   public long stop(String key) {
     Timer t = timers.get(key);
