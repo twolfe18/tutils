@@ -24,6 +24,7 @@ import edu.jhu.hlt.tutils.MultiAlphabet;
 public class DParseHeadFinder implements HeadFinder {
 
   public static boolean IGNORE_HEAD_TIES = false;
+  public static boolean IGNORE_NO_EXT_HEAD = false;
 
   public Function<Document, LabeledDirectedGraph> parse = d -> d.stanfordDepsBasic;
 
@@ -55,7 +56,7 @@ public class DParseHeadFinder implements HeadFinder {
         extHead = i;
       }
     }
-    if (extHead == -1)
+    if (extHead == -1 && !IGNORE_NO_EXT_HEAD)
       Log.warn("no external head");
     if (possible != null) {
       if (!IGNORE_HEAD_TIES)

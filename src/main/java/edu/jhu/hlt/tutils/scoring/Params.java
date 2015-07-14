@@ -1,5 +1,6 @@
 package edu.jhu.hlt.tutils.scoring;
 
+import java.io.Serializable;
 import java.util.Random;
 
 /**
@@ -12,12 +13,13 @@ import java.util.Random;
  * @param <S> the state/context of a decision (also called "x" in machine learning)
  * @param <A> the action to be taken (also called "y" in machine learning)
  */
-public interface Params<S, A> {
+public interface Params<S, A> extends Serializable {
 
   public Adjoints score(S state, A action);
 
   /** Returns a random score between 0 and 1 */
   public static class Rand<S, A> implements Params<S, A> {
+    private static final long serialVersionUID = 4214063845594289898L;
     private Random rand;
     public Rand(Random r) {
       this.rand = r;
@@ -30,6 +32,7 @@ public interface Params<S, A> {
 
   /** Always returns the same score (ignores arguments) */
   public static class Constant<S, A> implements Params<S, A> {
+    private static final long serialVersionUID = 8367571672676328343L;
     private Adjoints value;
     public Constant(double value) {
       this.value = new Adjoints.Constant(value);
@@ -41,6 +44,7 @@ public interface Params<S, A> {
   }
 
   public static class Sum<S, A> implements Params<S, A> {
+    private static final long serialVersionUID = -1053074209806524927L;
     private Params<S, A>[] params;
     @SafeVarargs
     public Sum(Params<S, A>... params) {
@@ -71,6 +75,7 @@ public interface Params<S, A> {
    * the other Params.
    */
   public static class Gaurd<S, A> implements Params<S, A> {
+    private static final long serialVersionUID = -9207301308719564915L;
     private final Params<S, A> first, rest;
     public Gaurd(Params<S, A> first, Params<S, A> rest) {
       this.first = first;

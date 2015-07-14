@@ -1,5 +1,7 @@
 package edu.jhu.hlt.tutils.scoring;
 
+import java.io.Serializable;
+
 import edu.jhu.prim.vector.IntDoubleVector;
 
 /**
@@ -26,7 +28,8 @@ public interface Adjoints {
 
 
   /** Adjoints representing a value which cannot be updated with backwards */
-  public static class Constant implements Adjoints {
+  public static class Constant implements Adjoints, Serializable {
+    private static final long serialVersionUID = 6071918010765316387L;
     private final double value;
     public Constant(double v) {
       this.value = v;
@@ -52,7 +55,8 @@ public interface Adjoints {
   }
 
   /** Sum of other Adjoints */
-  public static class Sum implements Adjoints {
+  public static class Sum implements Adjoints, Serializable {
+    private static final long serialVersionUID = -1294541640504248521L;
     private final Adjoints[] items;
     public Sum(Adjoints... items) {
       this.items = items;
@@ -114,6 +118,8 @@ public interface Adjoints {
       // Ideally I would fuse these operations, but I don't think this can be
       // done without runtime type inspection.
       IntDoubleVector update = features.copy();
+//      double l2 = update.getL2Norm();
+//      update.scale((-dErr_dForwards / l2) * getStepSize());
       update.scale(-dErr_dForwards * getStepSize());
       theta.add(update);
     }
