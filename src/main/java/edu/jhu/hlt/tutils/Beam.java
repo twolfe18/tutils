@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -64,6 +65,46 @@ public interface Beam<T> extends Iterable<T> {
     return sb.toString();
   }
 
+
+  /**
+   * BE CAREFUL with {@link Comparator}! a.compareTo(b) == 0  <=> a.equals(b)!
+   * This means that if you are putting these into anything that implements
+   * {@link Set} and compareTo returns 0, you will lose an {@link Item}!
+   */
+  public static final class Item<T> implements Comparable<Item<T>> {
+    private final T item;
+    private final double score;
+    private final int scoreTiebreaker;     // breaks ties when scores are equal
+
+    public Item(T item, double score, int scoreTiebreaker) {
+      this.item = item;
+      this.score = score;
+      this.scoreTiebreaker = scoreTiebreaker;
+    }
+
+    @Override
+    public String toString() {
+      return String.format("(Beam.Item %s %+.2f)", item, score);
+    }
+
+    public T getItem() { return item; }
+    public double getScore() { return score; }
+
+    @Override
+    public int compareTo(Item<T> o) {
+      if (score > o.score)
+        return -1;
+      if (score < o.score)
+        return 1;
+      assert (scoreTiebreaker == o.scoreTiebreaker) == (this == o);
+      if (scoreTiebreaker > o.scoreTiebreaker)
+        return -1;
+      if (scoreTiebreaker < o.scoreTiebreaker)
+        return 1;
+      return 0;
+    }
+  }
+
   public static <T> Beam<T> getMostEfficientImpl(int beamSize) {
     if (beamSize == 1)
       return new Beam1<>();
@@ -72,13 +113,17 @@ public interface Beam<T> extends Iterable<T> {
     return new BeamN<>(beamSize);
   }
 
+  public static <T> Beam<T> getUnboundedBeam() {
+    return new BeamN<>(-1);
+  }
+
   /**
    * An efficient width-4 beam.
    */
   public static class Beam4<T> implements Beam<T> {
-    private T i1, i2, i3, i4;
-    private double s1, s2, s3, s4;
+    private Item<T> x1, x2, x3, x4;
     private int size = 0;
+    private int tieCtr = 0;
 
     @Override
     public Iterator<T> iterator() {
@@ -103,13 +148,10 @@ public interface Beam<T> extends Iterable<T> {
     @Override
     public T pop() {
       assert size > 0;
-      T r = i1;
-      i1 = i2;
-      i2 = i3;
-      i3 = i4;
-      s1 = s2;
-      s2 = s3;
-      s3 = s4;
+      T r = x1.getItem();
+      x1 = x2;
+      x2 = x3;
+      x3 = x4;
       size--;
       return r;
     }
@@ -117,60 +159,48 @@ public interface Beam<T> extends Iterable<T> {
     @Override
     public T peek() {
       assert size > 0;
-      return i1;
+      return x1.getItem();
     }
 
     @Override
     public Item<T> popItem() {
       assert size > 0;
-      Item<T> i = new Item<>(i1, s1);
-      i1 = i2;
-      i2 = i3;
-      i3 = i4;
-      s1 = s2;
-      s2 = s3;
-      s3 = s4;
+      Item<T> r = x1;
+      x1 = x2;
+      x2 = x3;
+      x3 = x4;
       size--;
-      return i;
+      return r;
     }
 
     @Override
     public Item<T> peekItem() {
-      return new Item<>(i1, s1);
+      assert size > 0;
+      return x1;
     }
 
     @Override
     public boolean push(T item, double score) {
-      if (score > s1 || size < 1) {
-        i4 = i3;
-        i3 = i2;
-        i2 = i1;
-        i1 = item;
-        s4 = s3;
-        s3 = s2;
-        s2 = s1;
-        s1 = score;
+      if (size < 1 || score > x1.getScore()) {
+        x4 = x3;
+        x3 = x2;
+        x2 = x1;
+        x1 = new Item<>(item, score, tieCtr++);
         if (size < 4) size++;
         return true;
-      } else if (score > s2 || size < 2) {
-        i4 = i3;
-        i3 = i2;
-        i2 = item;
-        s4 = s3;
-        s3 = s2;
-        s2 = score;
+      } else if (size < 2 || score > x2.getScore()) {
+        x4 = x3;
+        x3 = x2;
+        x2 = new Item<>(item, score, tieCtr++);
         if (size < 4) size++;
         return true;
-      } else if (score > s3 || size < 3) {
-        i4 = i3;
-        i3 = item;
-        s4 = s3;
-        s3 = score;
+      } else if (size < 3 || score > x3.getScore()) {
+        x4 = x3;
+        x3 = new Item<>(item, score, tieCtr++);
         if (size < 4) size++;
         return true;
-      } else if (score > s4 || size < 4) {
-        i4 = item;
-        s4 = score;
+      } else if (size < 4 || score > x4.getScore()) {
+        x4 = new Item<>(item, score, tieCtr++);
         if (size < 4) size++;
         return true;
       } else {
@@ -190,31 +220,24 @@ public interface Beam<T> extends Iterable<T> {
 
     @Override
     public double maxScore() {
-      switch (size) {
-      case 0:
+      if (size == 0)
         return Double.NEGATIVE_INFINITY;
-      case 1:
-      case 2:
-      case 3:
-      case 4:
-        return s1;
-      default:
-        throw new IllegalStateException();
-      }
+      return x1.getScore();
     }
+
     @Override
     public double minScore() {
       switch (size) {
       case 0:
         return Double.NEGATIVE_INFINITY;
       case 1:
-        return s1;
+        return x1.getScore();
       case 2:
-        return s2;
+        return x2.getScore();
       case 3:
-        return s3;
+        return x3.getScore();
       case 4:
-        return s4;
+        return x4.getScore();
       default:
         throw new IllegalStateException();
       }
@@ -225,27 +248,27 @@ public interface Beam<T> extends Iterable<T> {
    * An efficient width-1 beam.
    */
   public static class Beam1<T> implements Beam<T> {
-    private T item;
-    private double score;
-    private boolean full = false;   // Needed in order to allow null items
+    private Item<T> x1;
 
     @Override
     public Iterator<T> iterator() {
-      if (!full)
+      if (x1 == null)
         return Collections.emptyIterator();
-      return Arrays.asList(item).iterator();
+      return Arrays.asList(x1.getItem()).iterator();
     }
 
     @Override
     public Iterator<Beam.Item<T>> itemIterator() {
-      if (!full)
+      if (x1 == null)
         return Collections.emptyIterator();
-      return Arrays.asList(new Item<>(item, score)).iterator();
+      return Arrays.asList(x1).iterator();
     }
 
     @Override
     public int size() {
-      return full ? 1 : 0;
+      if (x1 == null)
+        return 0;
+      return 1;
     }
 
     @Override
@@ -255,47 +278,43 @@ public interface Beam<T> extends Iterable<T> {
 
     @Override
     public T pop() {
-      if (!full)
+      if (x1 == null)
         throw new RuntimeException();
-      T temp = item;
-      item = null;
+      T temp = x1.getItem();
+      x1 = null;
       return temp;
     }
 
     @Override
     public Beam.Item<T> popItem() {
-      if (!full)
+      if (x1 == null)
         throw new RuntimeException();
-      Beam.Item<T> i = new Beam.Item<T>(item, score);
-      item = null;
-      full = false;
+      Item<T> i = x1;
+      x1 = null;
       return i;
     }
 
     @Override
     public T peek() {
-      if (!full)
+      if (x1 == null)
         throw new RuntimeException();
-      return item;
+      return x1.getItem();
     }
 
     @Override
     public Beam.Item<T> peekItem() {
-      if (!full)
+      if (x1 == null)
         throw new RuntimeException();
-      return new Beam.Item<T>(item, score);
+      return x1;
     }
 
     @Override
     public boolean push(T item, double score) {
-      if (!full || this.score < score) {
-        this.item = item;
-        this.score = score;
-        this.full = true;
+      if (x1 == null || score > x1.getScore()) {
+        x1 = new Item<>(item, score, 0);
         return true;
-      } else {
-        return false;
       }
+      return false;
     }
 
     @Override
@@ -310,37 +329,17 @@ public interface Beam<T> extends Iterable<T> {
 
     @Override
     public double maxScore() {
-      if (full)
-        return score;
-      return Double.NEGATIVE_INFINITY;
+      if (x1 == null)
+        return Double.NEGATIVE_INFINITY;
+      return x1.getScore();
     }
 
     @Override
     public double minScore() {
-      if (full)
-        return score;
-      return Double.NEGATIVE_INFINITY;
+      if (x1 == null)
+        return Double.NEGATIVE_INFINITY;
+      return x1.getScore();
     }
-  }
-
-  public static final class Item<T> {
-    private T item;
-    private double score;
-
-    public Item(T item, double score) {
-      this.item = item;
-      this.score = score;
-    }
-
-    @Override
-    public String toString() {
-      return String.format("(Beam.Item %s %+.2f)", item, score);
-    }
-
-    /** You can mutate the item (if you're careful), but you can never change the score */
-    public void setItem(T item) { this.item = item; }
-    public T getItem() { return item; }
-    public double getScore() { return score; }
   }
 
   /**
@@ -349,33 +348,20 @@ public interface Beam<T> extends Iterable<T> {
   public static class BeamN<T> implements Beam<T> {
     private SortedSet<Item<T>> beam;
     private int width;
+    private int tieCtr = 0;
 
+    /**
+     * @param width can be <=0, in which case this beam is unbounded (a priority queue).
+     */
     public BeamN(int width) {
       this.width = width;
-      this.beam = new TreeSet<>(new Comparator<Item<T>>() {
-        @SuppressWarnings("unchecked")
-        @Override
-        public int compare(Item<T> o1, Item<T> o2) {
-          double d = o1.getScore() - o2.getScore();
-          if (d > 0) {
-            return -1;
-          } else if (d < 0) {
-            return 1;
-          } else {
-            // If we return 0, then the SortedSet will deem these two entries
-            // equivalent and drop one of them.
-            T t1 = o1.getItem();
-            T t2 = o2.getItem();
-            return ((Comparable<T>) t1).compareTo(t2);
-          }
-        }
-      });
+      this.beam = new TreeSet<>();  // use Item natural ordering
     }
 
     public boolean push(T item, double score) {
-      Item<T> i = new Item<>(item, score);
+      Item<T> i = new Item<>(item, score, tieCtr++);
       beam.add(i);
-      if (beam.size() > width) {
+      if (beam.size() > width && width > 0) {
         Item<T> evict = beam.last();
         beam.remove(evict);
         return evict.item != item;
@@ -406,7 +392,7 @@ public interface Beam<T> extends Iterable<T> {
         return null;
       Item<T> it = beam.first();
       beam.remove(it);
-      return it.item;
+      return it.getItem();
     }
 
     @Override
