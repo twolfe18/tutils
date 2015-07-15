@@ -13,4 +13,9 @@ public class StringUtils {
     return sb.toString();
   }
 
+  public static String trim(String s, int maxLength) {
+    if (s.length() <= maxLength)
+      return s;
+    return s.substring(0, maxLength);
+  }
 }

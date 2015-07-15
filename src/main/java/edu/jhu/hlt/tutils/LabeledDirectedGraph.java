@@ -192,6 +192,13 @@ public class LabeledDirectedGraph implements Serializable {
       return LabeledDirectedGraph.this.new Node(n);
     }
 
+    public int getParentEdgeLabel(int i) {
+      if (numParents() == 0)
+        return Document.UNINITIALIZED;
+      long e = getParentEdge(i);
+      return unpackEdge(e);
+    }
+
     /** Returns the node index for the previous state */
     public int gotoParentNode(int i) {
       int oldNode = node;
