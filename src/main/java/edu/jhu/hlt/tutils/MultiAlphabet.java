@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -26,7 +27,8 @@ import edu.jhu.prim.bimap.IntObjectBimap;
  *
  * @author travis
  */
-public class MultiAlphabet {
+public class MultiAlphabet implements Serializable {
+  private static final long serialVersionUID = 4278409325590879328L;
 
   public static final String UNKNOWN = "UNKNOWN";
   public static final String NULL = "tHE-nULL-sTRING";  // how null is (de)serialized
@@ -85,6 +87,8 @@ public class MultiAlphabet {
     return posAlph.lookupIndex(pos, true);
   }
   public String pos(int i) {
+    if (i == Document.UNINITIALIZED)
+      return "UNINITIALIZED";
     return posAlph.lookupObject(i);
   }
   public int numPos() {
@@ -95,6 +99,8 @@ public class MultiAlphabet {
     return nerAlph.lookupIndex(ner, true);
   }
   public String ner(int i) {
+    if (i == Document.UNINITIALIZED)
+      return "UNINITIALIZED";
     return nerAlph.lookupObject(i);
   }
   public int numNer() {
@@ -105,6 +111,8 @@ public class MultiAlphabet {
     return wordAlph.lookupIndex(lemma, true);
   }
   public String lemma(int i) {
+    if (i == Document.UNINITIALIZED)
+      return "UNINITIALIZED";
     return wordAlph.lookupObject(i);
   }
 
@@ -112,6 +120,8 @@ public class MultiAlphabet {
     return shapeAlph.lookupIndex(shape, true);
   }
   public String shape(int i) {
+    if (i == Document.UNINITIALIZED)
+      return "UNINITIALIZED";
     return shapeAlph.lookupObject(i);
   }
 
@@ -126,6 +136,8 @@ public class MultiAlphabet {
     return cfgAlph.lookupIndex(cfg, true);
   }
   public String cfg(int i) {
+    if (i == Document.UNINITIALIZED)
+      return "UNINITIALIZED";
     return cfgAlph.lookupObject(i);
   }
   public String[] cfg(int[] i) {
@@ -139,6 +151,8 @@ public class MultiAlphabet {
     return wnSynsetAlph.lookupIndex(wnSynset, true);
   }
   public String wnSynset(int i) {
+    if (i == Document.UNINITIALIZED)
+      return "UNINITIALIZED";
     return wnSynsetAlph.lookupObject(i);
   }
 
@@ -146,6 +160,8 @@ public class MultiAlphabet {
     return depAlph.lookupIndex(dependencyArcLabel, true);
   }
   public String dep(int i) {
+    if (i == Document.UNINITIALIZED)
+      return "UNINITIALIZED";
     return depAlph.lookupObject(i);
   }
 
@@ -153,6 +169,8 @@ public class MultiAlphabet {
     return srlAlph.lookupIndex(srlLabel, true);
   }
   public String srl(int i) {
+    if (i == Document.UNINITIALIZED)
+      return "UNINITIALIZED";
     return srlAlph.lookupObject(i);
   }
 
