@@ -208,10 +208,10 @@ public class ConcreteToDocument {
     if (tags == null)
       return;
     if (tags.getTaggedTokenListSize() == 0) {
-      if (i == 0) {   // Only print this once per sentence
-        Log.warn("zero length TokenTagging! " + tags.getMetadata()
-            + " " + tags.getTaggingType() + " in " + toks.getUuid());
-      }
+//      if (i == 0) {   // Only print this once per sentence
+//        Log.warn("zero length TokenTagging! " + tags.getMetadata()
+//            + " " + tags.getTaggingType() + " in " + toks.getUuid());
+//      }
       return;
     }
     if (tags.getTaggedTokenListSize() != n) {
@@ -354,12 +354,13 @@ public class ConcreteToDocument {
    */
   public static int addCorefConstituents(
       List<Entity> entities,
+      String toolName,
       EntityMentionSet mentions,
       Document doc,
       ConcreteDocumentMapping mapping) {
 
     if (entities.isEmpty()) {
-      Log.warn("no entities!");
+      Log.warn("No entities in \"" + toolName + "\"");
       return Document.NONE;
     }
 
@@ -371,7 +372,7 @@ public class ConcreteToDocument {
     for (Entity ent : entities) {          // LOOP over Entities
 
       if (ent.getMentionIdListSize() == 0)
-        throw new RuntimeException("empty Entity?");
+        throw new RuntimeException("Empty Entity?");
 
       Constituent entC = doc.newConstituent();
 
@@ -869,7 +870,7 @@ public class ConcreteToDocument {
       if (!es.isSetMentionSetId())
         throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
       EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
-      doc.cons_coref_gold = addCorefConstituents(es.getEntityList(), ems, doc, mapping);
+      doc.cons_coref_gold = addCorefConstituents(es.getEntityList(), corefToolGold, ems, doc, mapping);
     }
     if (corefToolAuto != null) {
       if (debug)
@@ -878,7 +879,7 @@ public class ConcreteToDocument {
       if (!es.isSetMentionSetId())
         throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
       EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
-      doc.cons_coref_auto = addCorefConstituents(es.getEntityList(), ems, doc, mapping);
+      doc.cons_coref_auto = addCorefConstituents(es.getEntityList(), corefToolAuto, ems, doc, mapping);
     }
 
     // Add coref mentions
