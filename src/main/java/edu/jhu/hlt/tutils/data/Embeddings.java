@@ -2,6 +2,7 @@ package edu.jhu.hlt.tutils.data;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.Serializable;
 
 import edu.jhu.hlt.tutils.FileUtil;
 import edu.jhu.hlt.tutils.Log;
@@ -9,7 +10,8 @@ import edu.jhu.hlt.tutils.MultiAlphabet;
 import edu.jhu.hlt.tutils.ling.Language;
 import edu.jhu.prim.map.IntIntHashMap;
 
-public class Embeddings {
+public class Embeddings implements Serializable {
+  private static final long serialVersionUID = -1602073535396837260L;
 
   public static final boolean USE_DOUBLE_AS_DEFAULT = false;
   public static final int DEFAULT_VOCAB_LIMIT = 400_000;
@@ -41,6 +43,7 @@ public class Embeddings {
    * and limit says how many to take at the most.
    */
   private static Embeddings getEmbFromTextFile(File f, MultiAlphabet alph, boolean useDoubles, int limit) {
+    Log.info("reading embeddings from " + f.getPath());
     try (BufferedReader r = FileUtil.getReader(f)) {
       String header = r.readLine();
       String[] toks = header.split("\\s+");
@@ -59,7 +62,7 @@ public class Embeddings {
       e.alph = alph;
       e.mux = new IntIntHashMap();
       int i2 = 0;
-      for (int i = 0; i < dimension && r.ready(); i++) {
+      for (int i = 0; i < vocabSize && r.ready(); i++) {
         String line = r.readLine();
         toks = line.split("\\s+");
         assert toks.length == dimension + 1;
@@ -74,6 +77,7 @@ public class Embeddings {
         e.mux.put(i1, i2);
         i2++;
       }
+      Log.info("done, mux.size=" + e.mux.size() + " i2=" + i2);
       return e;
     } catch (Exception e) {
       throw new RuntimeException(e);
