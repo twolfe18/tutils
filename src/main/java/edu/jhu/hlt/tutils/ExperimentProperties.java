@@ -19,7 +19,9 @@ public class ExperimentProperties extends java.util.Properties {
     if (mainArgs.length % 2 != 0)
       throw new IllegalArgumentException();
     for (int i = 0; i < mainArgs.length; i += 2) {
-      Object old = put(mainArgs[i], mainArgs[i+1]);
+      String key = mainArgs[i].replaceFirst("^-{0,2}", "");
+      String value = mainArgs[i+1];
+      Object old = put(key, value);
       if (!allowOverwrites && old != null) {
         throw new RuntimeException(mainArgs[i] + " has two values: "
             + mainArgs[i+1] + " and " + old);

@@ -96,7 +96,7 @@ public class DParseHeadFinder implements HeadFinder {
     ConcreteToDocument cio = new ConcreteToDocument(null, null, null, lang);
     cio.debug = true;
     cio.clearTools();
-    cio.ingestConcreteStanford = true;
+    cio.dparseBasicTool = ConcreteToDocument.STANFORD_DPARSE_BASIC;
     Random rand = new Random(9001);
     TarGzCompactCommunicationSerializer ts = new TarGzCompactCommunicationSerializer();
     Iterator<Communication> itr = ts.fromTarGz(Files.newInputStream(concreteFile.toPath()));

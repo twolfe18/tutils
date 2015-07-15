@@ -99,44 +99,94 @@ public class ConcreteToDocument {
   public boolean debug_cons = false;
 
   /** Only supports a single POS {@link TokenTagging} for now */
-  protected String posToolName = "conll-2011 POS";
+  public Predicate<TokenTagging> posToolGold;
+  public Predicate<TokenTagging> posToolAuto;
 
   /** Only supports {@link TokenTagging} style NER for now */
-  protected String nerToolName = "conll-2011 NER";
+  public Predicate<TokenTagging> nerToolGold;
+  public Predicate<TokenTagging> nerToolAuto;
+
+  public Predicate<TokenTagging> lemmaTool;
 
   /** Only supports a single {@link Parse} for now */
-  protected String consParseToolName = "conll-2011 parse";
-  // TODO allow this to be set set separately
+  public String cparseToolGold;
+  public String cparseToolAuto;
+
+  public Predicate<DependencyParse> dparseBasicTool;   // stanfordDepsBasic
+  public Predicate<DependencyParse> dparseColTool;     // stanfordDepsCollapsed
+  public Predicate<DependencyParse> dparseColCCTool;   // stanfordDepsCollapsedCC
+  public Predicate<DependencyParse> dparseUDTool;      // universalDependencies
 
   /**
    * Assumes Propbank SRL is stored as a {@link SituationMention} using
    * {@link ConstituentRef}. See the documentation in {@link Document} for how
    * they are added to the {@link Document}.
    */
-  protected String propbankSrlToolName = null;
+  public String propbankToolGold;      // cons_propbank_gold
+  public String propbankToolAuto;      // cons_propbank_auto
 
   /**
    * Looks for an {@link EntitySet} matching this tool name and adds them to
    * {@link Document#cons_coref_gold}.
    */
-  protected String entitySetToolName = null;
+  public String corefToolGold;     // cons_coref_gold
+  public String corefToolAuto;     // cons_coref_auto
 
-  // If true, look for concrete-stanford pos, ner, lemma, cparse, dparse{1,2,3},
-  // coref and put them into stanford-specific fields in Document.
-  public boolean ingestConcreteStanford = false;
+  /**
+   * These operate independently of the coref tools. Even if I wanted to re-use
+   * the mention set (i.e. it's the same in concrete), this is not possible
+   * because the sibling pointers in an entity constituent must terminate at
+   * the entity boundary; so we can't just re-use the linked list with
+   *   doc.cons_coref_mention_gold = leftChild(doc.cons_coref_gold)
+   *
+   * If you want to be pedantic, we could have all the mentions be in the same
+   * list and use:
+   *    for (mention = entity.leftChild; mention.parent == entity.index; ...)
+   * but I know that is too tricky and would bite me...
+   */
+  public String corefMentionToolGold;   // cons_coref_mention_gold
+  public String corefMentionToolAuto;   // cons_coref_mention_auto
 
   protected BrownClusters bc256, bc1000;
   protected IRAMDictionary wnDict;
 
-  protected Language lang;
+  public Language lang;
 
   public void clearTools() {
-    posToolName = null;
-    nerToolName = null;
-    consParseToolName = null;
-    propbankSrlToolName = null;
-    entitySetToolName = null;
-    ingestConcreteStanford = false;
+    lemmaTool = null;
+    posToolGold = null;
+    posToolAuto = null;
+    nerToolGold = null;
+    nerToolAuto = null;
+    cparseToolGold = null;
+    cparseToolAuto = null;
+    dparseBasicTool = null;
+    dparseColTool = null;
+    dparseColCCTool = null;
+    dparseUDTool = null;
+    propbankToolGold = null;
+    propbankToolAuto = null;
+    corefToolGold = null;
+    corefToolAuto = null;
+    corefMentionToolGold = null;
+    corefMentionToolAuto = null;
+  }
+
+  public void readConll() {
+    corefToolGold = "conll-2011 coref";
+    cparseToolGold = "conll-2011 parse";
+    posToolGold = tt -> "conll-2011 pos".equalsIgnoreCase(tt.getMetadata().getTool());
+    nerToolGold = tt -> "conll-2011 ner".equalsIgnoreCase(tt.getMetadata().getTool());
+  }
+
+  public void readConcreteStanford() {
+    corefToolAuto = "Stanford Coref";
+    dparseBasicTool = ConcreteToDocument.STANFORD_DPARSE_BASIC;
+    dparseColTool = ConcreteToDocument.STANFORD_DPARSE_COLL;
+    dparseColCCTool = ConcreteToDocument.STANFORD_DPARSE_COLL_CC;
+    posToolAuto = STANFORD_POS;
+    nerToolAuto = STANFORD_NER;
+    lemmaTool = STANFORD_LEMMA;
   }
 
   /**
@@ -153,32 +203,7 @@ public class ConcreteToDocument {
     this.lang = lang;
   }
 
-  public Language getLanguage() {
-    return lang;
-  }
-
-  public void setNerToolName(String toolName) {
-    this.nerToolName = toolName;
-  }
-
-  public void setPosToolName(String toolName) {
-    this.posToolName = toolName;
-  }
-
-  public void setConstituencyParseToolname(String toolName) {
-    this.consParseToolName = toolName;
-  }
-
-  public void setPropbankToolname(String toolName) {
-    this.propbankSrlToolName = toolName;
-  }
-
-  public void setCorefToolname(String toolName) {
-    this.entitySetToolName = toolName;
-  }
-
-
-  public static void setTokenHelper(IntConsumer tokSet, ToIntFunction<String> alph, TokenTagging tags, int i, Tokenization toks) {
+  private static void setTokenHelper(IntConsumer tokSet, ToIntFunction<String> alph, TokenTagging tags, int i, Tokenization toks) {
     int n = toks.getTokenList().getTokenListSize();
     if (tags == null)
       return;
@@ -233,9 +258,12 @@ public class ConcreteToDocument {
     }
 
     // WordNet synset id
-    if (wnDict != null && posG != null && lang == Language.EN) {
+    TokenTagging pos = posG != null ? posG : posH;
+    if (wnDict != null && pos != null && lang == Language.EN) {
+      assert pos.getTaggedTokenListSize() == t.getTokenList().getTokenListSize();
+      String p = pos.getTaggedTokenList().get(tokenIdx).getTag();
       token.setWnSynset(alph.wnSynset(MultiAlphabet.UNKNOWN));
-      edu.mit.jwi.item.POS wnPos = WordNetPosUtil.ptb2wordNet(token.getPosStr());
+      edu.mit.jwi.item.POS wnPos = WordNetPosUtil.ptb2wordNet(p);
       if (wnPos != null) {
         String wd = token.getLemma() >= 0 ? alph.word(token.getLemma()) : token.getWordStr();
         IIndexWord wnWord = wnDict.getIndexWord(wd, wnPos);
@@ -250,45 +278,108 @@ public class ConcreteToDocument {
   }
 
   /**
+   * @returns a constituent index of the first {@link EntityMention} given
+   * (which may be Document.NONE if the given set is empty).
+   *
+   * If parent is a valid constituent, this will update the firstChild and lastChild
+   * pointers in congruence with the added children.
+   */
+  public static int addEntityMentions(
+      List<EntityMention> mentions,
+      int parentConstituent,
+      Document doc,
+      ConcreteDocumentMapping mapping) {
+
+    if (mentions.size() == 0) {
+      Log.warn("no mentions!");
+      return Document.NONE;
+    }
+
+    if (parentConstituent >= 0)
+      doc.getConstituent(parentConstituent).setOnlyChild(Document.NONE);
+
+    MultiAlphabet alph = doc.getAlphabet();
+    int ret = -1;
+    int prev = Document.NONE;
+    for (EntityMention em : mentions) {
+      if (em.getChildMentionIdListSize() > 0)
+        throw new RuntimeException("recursive EntityMentions are not supported");
+
+      Constituent c = doc.newConstituent();
+
+      // Update parent left/right child pointers
+      if (ret < 0) {
+        ret = c.getIndex();
+        if (parentConstituent >= 0) {
+          assert doc.getConstituent(parentConstituent).getLeftChild() < 0;
+          doc.getConstituent(parentConstituent).setLeftChild(c.getIndex());
+        }
+      }
+      if (parentConstituent >= 0)
+        doc.getConstituent(parentConstituent).setRightChild(c.getIndex());
+
+      // Update Document.Constituent <=> EntityMention mapping
+      mapping.put(c, em.getUuid());
+
+      TokenRefSequence trs = em.getTokens();
+      List<Integer> tokens = trs.getTokenIndexList();
+      if (!ascending(tokens))
+        throw new RuntimeException("can't handle split sequences");
+      // Convert from sentence-relative to document-relative
+      Document.Constituent sentence = mapping.get(trs.getTokenizationId());
+      int first = sentence.getFirstToken() + tokens.get(0);
+      int last = sentence.getFirstToken() + tokens.get(tokens.size() - 1);
+
+      c.setLhs(alph.ner(em.getEntityType()));
+      c.setParent(parentConstituent);
+      c.setOnlyChild(Document.NONE);
+      c.setFirstToken(first);
+      c.setLastToken(last);
+      c.setLeftSib(prev);
+      if (prev >= 0)
+        doc.getConstituent(prev).setRightSib(c.getIndex());
+      prev = c.getIndex();
+    }
+    return ret;
+  }
+
+  /**
    * Returns the coreference clustering represented by coref as constituents in
    * the document (see {@link Document#cons_coref_gold} for documentation on
    * the representation).
    * @param mapping may be null
    * @return the first Constituent (which is a pointer to an {@link Entity} and
-   * also a linked list representing a {@link EntitySet}) added or null if coref
-   * is empty.
+   * also a linked list representing a {@link EntitySet}) added or Document.NONE
+   * if the coref/entity set is empty.
    */
-  public static Constituent addCorefConstituents(
-      EntitySet coref,
+  public static int addCorefConstituents(
+      List<Entity> entities,
       EntityMentionSet mentions,
       Document doc,
-      ConcreteDocumentMapping mapping,
-      MultiAlphabet alph) {
+      ConcreteDocumentMapping mapping) {
 
-    int added = 0;
-    Constituent start = doc.newConstituent();
-
-    // In the event that there are no entities in this coreference set
-    // (this is allowed, there must be 1+ mentions in each entity, but there
-    // can be 0 entities in a EntitySet).
-    start.setLhs(alph.word("NullEntity"));  // more for debugging than processing
-    start.setParent(Document.NONE);
-    start.setOnlyChild(Document.NONE);
-    start.setLeftSib(Document.NONE);
-    start.setRightSib(Document.NONE);
+    if (entities.isEmpty()) {
+      Log.warn("no entities!");
+      return Document.NONE;
+    }
 
     Map<UUID, EntityMention> ems = indexByUUID(mentions.getMentionList());
 
+    MultiAlphabet alph = doc.getAlphabet();
+    int ret = -1;
     int prevEnt = Document.NONE;
-    for (Entity ent : coref.getEntityList()) {          // LOOP over Entities
+    for (Entity ent : entities) {          // LOOP over Entities
 
       if (ent.getMentionIdListSize() == 0)
         throw new RuntimeException("empty Entity?");
 
-      Constituent entC = added == 0 ? start : doc.newConstituent();
+      Constituent entC = doc.newConstituent();
+
+      if (ret < 0)
+        ret = entC.getIndex();
+
       entC.setParent(Document.NONE);
-      entC.setLhs(alph.word(ent.getType()));
-      entC.setOnlyChild(Document.NONE);
+      entC.setLhs(alph.ner(ent.getType()));
       entC.setLeftSib(prevEnt);
       entC.setRightSib(Document.NONE);
       if (prevEnt != Document.NONE)
@@ -298,47 +389,11 @@ public class ConcreteToDocument {
       // Update mapping: Entity.UUID
       mapping.put(entC, ent.getUuid());
 
-      int prevMention = Document.NONE;
-      for (UUID emId : ent.getMentionIdList()) {        // LOOP over Mentions
-
-        Constituent cons = doc.newConstituent();
-
-        // Update parent
-        if (entC.getLeftChild() == Document.NONE)
-          entC.setLeftChild(cons.getIndex());
-        entC.setRightChild(cons.getIndex());
-
-        // Update mapping: EntityMention.UUID
-        mapping.put(doc.getConstituent(cons.getIndex()), emId);
-
-        EntityMention em = ems.get(emId);
-        TokenRefSequence trs = em.getTokens();
-        List<Integer> tokens = trs.getTokenIndexList();
-        if (!ascending(tokens))
-          throw new RuntimeException("can't handle split sequences");
-        // Convert from sentence-relative to document-relative
-        Document.Constituent sentence = mapping.get(trs.getTokenizationId());
-        int first = sentence.getFirstToken() + tokens.get(0);
-        int last = sentence.getFirstToken() + tokens.get(tokens.size() - 1);
-
-        entC.setRightChild(cons.getIndex());
-        cons.setLhs(entC.getLhs());
-        cons.setParent(entC.getIndex());
-        cons.setOnlyChild(Document.NONE);
-        cons.setFirstToken(first);
-        cons.setLastToken(last);
-        cons.setLeftSib(prevMention);
-        cons.setRightSib(Document.NONE);
-        if (prevMention != Document.NONE)
-          doc.getConstituent(prevMention).setRightSib(cons.getIndex());
-        prevMention = cons.getIndex();
-        added++;
-      }
+      // Add mentions (this handles entC's children)
+      List<EntityMention> ms = join(ent.getMentionIdList(), ems);
+      addEntityMentions(ms, entC.getIndex(), doc, mapping);
     }
-
-    if (added == 0)
-      Log.warn("empty EntitySet? coref=" + coref);
-    return start;
+    return ret;
   }
 
   public static boolean ascending(List<Integer> numbers) {
@@ -675,14 +730,13 @@ public class ConcreteToDocument {
     LabeledDirectedGraph.Builder dparseBasic = new LabeledDirectedGraph().new Builder();
     LabeledDirectedGraph.Builder dparseColl = new LabeledDirectedGraph().new Builder();
     LabeledDirectedGraph.Builder dparseCollCC = new LabeledDirectedGraph().new Builder();
+    LabeledDirectedGraph.Builder dparseUD = new LabeledDirectedGraph().new Builder();
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
-
         Tokenization tkz = ss.getTokenization();
 
         if (debug) {
           System.out.println();
-          System.out.println("ingestConcreteStanford=" + ingestConcreteStanford);
           for (TokenTagging tt : tkz.getTokenTaggingList()) {
             System.out.println("tokOffset=" + tokenOffset
                 + " TokenTagging type=" + tt.getTaggingType()
@@ -698,19 +752,24 @@ public class ConcreteToDocument {
           }
         }
 
+        // Add tokens and token taggings
         TokenTagging posG = null;
-        if (posToolName != null)
-          posG = findByTool(tkz.getTokenTaggingList(), posToolName);
+        if (posToolGold != null)
+          posG = findByPredicate(tkz.getTokenTaggingList(), posToolGold);
+        TokenTagging posH = null;
+        if (posToolAuto != null)
+          posH = findByPredicate(tkz.getTokenTaggingList(), posToolAuto);
+
         TokenTagging nerG = null;
-        if (nerToolName != null)
-          nerG = findByTool(tkz.getTokenTaggingList(), nerToolName);
+        if (nerToolGold != null)
+          nerG = findByPredicate(tkz.getTokenTaggingList(), nerToolGold);
+        TokenTagging nerH = null;
+        if (nerToolGold != null)
+          nerH = findByPredicate(tkz.getTokenTaggingList(), nerToolAuto);
+
         TokenTagging lemma = null;
-        TokenTagging posH = null, nerH = null;
-        if (ingestConcreteStanford) {
-          lemma = findByPredicate(tkz.getTokenTaggingList(), STANFORD_LEMMA);
-          posH = findByPredicate(tkz.getTokenTaggingList(), STANFORD_POS);
-          nerH = findByPredicate(tkz.getTokenTaggingList(), STANFORD_NER);
-        }
+        if (lemmaTool != null)
+          lemma = findByPredicate(tkz.getTokenTaggingList(), lemmaTool);
 
         int n = tkz.getTokenList().getTokenListSize();
         for (int i = 0; i < n; i++) {
@@ -721,8 +780,9 @@ public class ConcreteToDocument {
           }
         }
 
-        if (consParseToolName != null) {
-          Parse parseG = findByTool(tkz.getParseList(), consParseToolName);
+        // Add constituency parses
+        if (cparseToolGold != null) {
+          Parse parseG = findByTool(tkz.getParseList(), cparseToolGold);
           Constituent rootG = addParseConstituents(parseG, tokenOffset, doc, constituentIndices, alph);
           if (doc.cons_ptb_gold == Document.NONE)
             doc.cons_ptb_gold = rootG.getIndex();
@@ -733,10 +793,8 @@ public class ConcreteToDocument {
             doc.getConstituent(prevParseG).setRightSib(rootG.getIndex());
           prevParseG = rootG.getIndex();
         }
-
-        if (ingestConcreteStanford) {
-          // cparse
-          Parse parseH = findByPredicate(tkz.getParseList(), STANFORD_CPARSE);
+        if (cparseToolAuto != null) {
+          Parse parseH = findByTool(tkz.getParseList(), cparseToolAuto);
           Constituent rootH = addParseConstituents(parseH, tokenOffset, doc, constituentIndices, alph);
           if (doc.cons_ptb_auto == Document.NONE)
             doc.cons_ptb_auto = rootH.getIndex();
@@ -746,91 +804,95 @@ public class ConcreteToDocument {
           if (prevParseH != Document.NONE)
             doc.getConstituent(prevParseH).setRightSib(rootH.getIndex());
           prevParseH = rootH.getIndex();
-
-          // dparse(s)
-          // Uses numToks (count for the document) as the root index in these
-          // dep trees. This is a requirement due to not being able to bit-pack
-          // negative numbers (LabeledDirectedGraph limitation).
-          assert numToks > 0;
-          dparseBasic.addFromConcrete(
-              findByPredicate(tkz.getDependencyParseList(), STANFORD_DPARSE_BASIC),
-              tokenOffset, n, numToks, alph);
-          dparseColl.addFromConcrete(
-              findByPredicate(tkz.getDependencyParseList(), STANFORD_DPARSE_COLL),
-              tokenOffset, n, numToks, alph);
-          dparseCollCC.addFromConcrete(
-              findByPredicate(tkz.getDependencyParseList(), STANFORD_DPARSE_COLL_CC),
-              tokenOffset, n, numToks, alph);
         }
+
+        // Add dependency parses
+        // Uses numToks (count for the document) as the root index in these
+        // dep trees. This is a requirement due to not being able to bit-pack
+        // negative numbers (LabeledDirectedGraph limitation).
+        assert numToks > 0;
+        dparseBasic.addFromConcrete(
+            findByPredicate(tkz.getDependencyParseList(), this.dparseBasicTool),
+            tokenOffset, n, numToks, alph);
+        dparseColl.addFromConcrete(
+            findByPredicate(tkz.getDependencyParseList(), this.dparseColTool),
+            tokenOffset, n, numToks, alph);
+        dparseCollCC.addFromConcrete(
+            findByPredicate(tkz.getDependencyParseList(), this.dparseColCCTool),
+            tokenOffset, n, numToks, alph);
+        dparseUD.addFromConcrete(
+            findByPredicate(tkz.getDependencyParseList(), this.dparseUDTool),
+            tokenOffset, n, numToks, alph);
 
         tokenOffset += n;
       }
     }
 
-    if (ingestConcreteStanford) {
-      if (debug)
-        Log.info("freezing/adding stanford dependency parses, numToks=" + numToks);
+    if (dparseBasic.numEdges() > 0)
       doc.stanfordDepsBasic = dparseBasic.freeze();
+    if (dparseColl.numEdges() > 0)
       doc.stanfordDepsCollapsed = dparseColl.freeze();
+    if (dparseCollCC.numEdges() > 0)
       doc.stanfordDepsCollapsedCC = dparseCollCC.freeze();
-    }
+    if (dparseUD.numEdges() > 0)
+      doc.universalDependencies = dparseUD.freeze();
 
     doc.computeDepths();
 
     assert tester.firstAndLastTokensValid();
 
     // Add Propbank SRL
-    if (this.propbankSrlToolName != null) {
+    if (propbankToolGold != null) {
       if (debug)
-        Log.info("adding propbank");
-      Constituent propbankSrl = addPropbankSrl(c, this.propbankSrlToolName,
-          constituentIndices, mapping, alph);
+        Log.info("adding propbankToolGold=" + propbankToolGold);
+      Constituent propbankSrl = addPropbankSrl(c, propbankToolGold, constituentIndices, mapping, alph);
       if (propbankSrl == null)
-        Log.warn("Failed to get Propbank SRL");
+        throw new RuntimeException();
       else
         doc.cons_propbank_gold = propbankSrl.getIndex();
     }
+    if (propbankToolAuto != null) {
+      if (debug)
+        Log.info("adding propbankToolAuto=" + propbankToolAuto);
+      Constituent propbankSrl = addPropbankSrl(c, propbankToolAuto, constituentIndices, mapping, alph);
+      if (propbankSrl == null)
+        throw new RuntimeException();
+      else
+        doc.cons_propbank_auto = propbankSrl.getIndex();
+    }
 
     // Add coref
-    if (entitySetToolName != null) {
+    if (corefToolGold != null) {
       if (debug)
-        Log.info("adding EntityMentionSet: " + entitySetToolName);
-      EntitySet es = findByTool(c.getEntitySetList(), entitySetToolName);
+        Log.info("adding corefToolGold=" + corefToolGold);
+      EntitySet es = findByTool(c.getEntitySetList(), corefToolGold);
       if (!es.isSetMentionSetId())
         throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
       EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
-      Constituent coref = addCorefConstituents(es, ems, doc, mapping, alph);
-      if (coref == null)
-        throw new RuntimeException("emtpy EntitySet? " + es.getUuid());
-      else
-        doc.cons_coref_gold = coref.getIndex();
+      doc.cons_coref_gold = addCorefConstituents(es.getEntityList(), ems, doc, mapping);
     }
-    if (ingestConcreteStanford) {
-      EntitySet es = findByPredicate(c.getEntitySetList(), STANFORD_COREF);
-      if (es == null) {
-        for (EntitySet i : c.getEntitySetList())
-          System.err.println(i);
-        Log.warn("couldn't find Stanford coref");
-        assert doc.cons_coref_auto == Document.NONE;
-      } else {
-        EntityMentionSet ems;
-        if (es.isSetMentionSetId()) {
-          ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
-        } else if (c.getEntityMentionSetListSize() == 1) {
-          Log.warn("EntitySet.mentionSet is not set! Since there is only one "
-              + "EntityMentionSet, we're going to assume thats it!");
-          ems = c.getEntityMentionSetList().get(0);
-        } else {
-          // DEBUG
-          ems = c.getEntityMentionSetList().get(0);
-//          throw new RuntimeException("can't find EntityMentionSet, #ems=" + c.getEntityMentionSetListSize());
-        }
-        Constituent coref = addCorefConstituents(es, ems, doc, mapping, alph);
-        if (coref == null)
-          throw new RuntimeException("emtpy EntitySet? " + es.getUuid());
-        else
-          doc.cons_coref_auto = coref.getIndex();
-      }
+    if (corefToolAuto != null) {
+      if (debug)
+        Log.info("adding corefToolAuto=" + corefToolAuto);
+      EntitySet es = findByTool(c.getEntitySetList(), corefToolAuto);
+      if (!es.isSetMentionSetId())
+        throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
+      EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
+      doc.cons_coref_auto = addCorefConstituents(es.getEntityList(), ems, doc, mapping);
+    }
+
+    // Add coref mentions
+    if (corefMentionToolGold != null) {
+      if (debug)
+        Log.info("adding corefMentionToolGold=" + corefMentionToolGold);
+      EntityMentionSet ems = findByTool(c.getEntityMentionSetList(), corefMentionToolGold);
+      doc.cons_coref_mention_gold = addEntityMentions(ems.getMentionList(), Document.NONE, doc, mapping);
+    }
+    if (corefMentionToolAuto != null) {
+      if (debug)
+        Log.info("adding corefMentionToolAuto=" + corefMentionToolAuto);
+      EntityMentionSet ems = findByTool(c.getEntityMentionSetList(), corefMentionToolAuto);
+      doc.cons_coref_mention_auto = addEntityMentions(ems.getMentionList(), Document.NONE, doc, mapping);
     }
 
     // Compute BrownClusters
@@ -991,13 +1053,17 @@ public class ConcreteToDocument {
   }
 
   public static <T> T findByPredicate(List<T> items, Predicate<T> p) {
+    if (p == null)
+      return null;
     List<T> possible = new ArrayList<>();
     for (T t : items) {
       if (p.test(t))
         possible.add(t);
     }
-    if (possible.size() != 1)
-      throw new RuntimeException("not exactly one match: " + possible);
+    if (possible.size() != 1) {
+      throw new RuntimeException("not exactly one match:\n"
+          + StringUtils.join("\n", possible));
+    }
 //    if (possible.size() == 0)
 //      return null;
     return possible.get(0);

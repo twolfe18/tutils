@@ -347,8 +347,10 @@ public final class Document implements Serializable {
     if (numTokens <= 0)
       throw new IllegalArgumentException();
 
-    if (LOG_ALLOCATIONS)
-      Log.info(word.length + " => " + numTokens);
+    if (LOG_ALLOCATIONS) {
+      int l = word == null ? 0 : word.length;
+      Log.info(l + " => " + numTokens);
+    }
     assert allowExpansion;
 
     word = copy(word, numTokens, UNINITIALIZED);
@@ -373,8 +375,10 @@ public final class Document implements Serializable {
     if (numConstituents < 0)
       throw new IllegalArgumentException();
 
-    if (LOG_ALLOCATIONS)
-      Log.info(lhs.length + " => " + numConstituents);
+    if (LOG_ALLOCATIONS) {
+      int l = lhs == null ? 0 : lhs.length;
+      Log.info(l + " => " + numConstituents);
+    }
     assert allowExpansion;
 
     lhs = copy(lhs, numConstituents, UNINITIALIZED);
@@ -521,7 +525,6 @@ public final class Document implements Serializable {
 
     /** Use sparingly: Not always obvious which alph sub-section to use. */
     public String getWordStr() { return alph.word(word[index]); }
-    public String getPosStr() { return alph.pos(posG[index]); }
 
     public int getIndex() { return index; }
     public int getWord() { return word[index]; }
