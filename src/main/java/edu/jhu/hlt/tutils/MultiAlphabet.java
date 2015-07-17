@@ -77,6 +77,10 @@ public class MultiAlphabet implements Serializable {
     return wordAlph.lookupIndex(w, true);
   }
   public String word(int i) {
+    if (i == Document.UNINITIALIZED)
+      return "UNINITIALIZED";
+    if (i == Document.NONE)
+      return "NONE";
     return wordAlph.lookupObject(i);
   }
   public int numWord() {
@@ -89,6 +93,8 @@ public class MultiAlphabet implements Serializable {
   public String pos(int i) {
     if (i == Document.UNINITIALIZED)
       return "UNINITIALIZED";
+    if (i == Document.NONE)
+      return "NONE";
     return posAlph.lookupObject(i);
   }
   public int numPos() {
@@ -101,6 +107,8 @@ public class MultiAlphabet implements Serializable {
   public String ner(int i) {
     if (i == Document.UNINITIALIZED)
       return "UNINITIALIZED";
+    if (i == Document.NONE)
+      return "NONE";
     return nerAlph.lookupObject(i);
   }
   public int numNer() {
@@ -113,6 +121,8 @@ public class MultiAlphabet implements Serializable {
   public String lemma(int i) {
     if (i == Document.UNINITIALIZED)
       return "UNINITIALIZED";
+    if (i == Document.NONE)
+      return "NONE";
     return wordAlph.lookupObject(i);
   }
 
@@ -122,6 +132,8 @@ public class MultiAlphabet implements Serializable {
   public String shape(int i) {
     if (i == Document.UNINITIALIZED)
       return "UNINITIALIZED";
+    if (i == Document.NONE)
+      return "NONE";
     return shapeAlph.lookupObject(i);
   }
 
@@ -138,6 +150,8 @@ public class MultiAlphabet implements Serializable {
   public String cfg(int i) {
     if (i == Document.UNINITIALIZED)
       return "UNINITIALIZED";
+    if (i == Document.NONE)
+      return "NONE";
     return cfgAlph.lookupObject(i);
   }
   public String[] cfg(int[] i) {
@@ -153,6 +167,8 @@ public class MultiAlphabet implements Serializable {
   public String wnSynset(int i) {
     if (i == Document.UNINITIALIZED)
       return "UNINITIALIZED";
+    if (i == Document.NONE)
+      return "NONE";
     return wnSynsetAlph.lookupObject(i);
   }
 
@@ -162,6 +178,8 @@ public class MultiAlphabet implements Serializable {
   public String dep(int i) {
     if (i == Document.UNINITIALIZED)
       return "UNINITIALIZED";
+    if (i == Document.NONE)
+      return "NONE";
     return depAlph.lookupObject(i);
   }
 
@@ -171,6 +189,8 @@ public class MultiAlphabet implements Serializable {
   public String srl(int i) {
     if (i == Document.UNINITIALIZED)
       return "UNINITIALIZED";
+    if (i == Document.NONE)
+      return "NONE";
     return srlAlph.lookupObject(i);
   }
 
