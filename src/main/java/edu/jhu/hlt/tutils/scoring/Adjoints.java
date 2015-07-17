@@ -2,6 +2,7 @@ package edu.jhu.hlt.tutils.scoring;
 
 import java.io.Serializable;
 
+import edu.jhu.prim.vector.IntDoubleDenseVector;
 import edu.jhu.prim.vector.IntDoubleVector;
 
 /**
@@ -85,6 +86,66 @@ public interface Adjoints {
 
   // TODO max, prod, neg, div, etc
 
+  public static class SingleHiddenLayer implements Adjoints {
+    private IntDoubleVector features;
+    private IntDoubleVector[] f2h;     // features -> hidden
+    private IntDoubleVector h2o;       // hidden -> output
+
+    // Result of forwards pass
+    private IntDoubleVector hiddenActivations;
+    private double output;
+
+    public SingleHiddenLayer(IntDoubleVector[] f2h, IntDoubleVector h2o, IntDoubleVector features) {
+      this.f2h = f2h;
+      this.h2o = h2o;
+      this.features = features;
+    }
+
+    public int hiddenDimension() {
+      return f2h.length;
+    }
+
+    @Override
+    public double forwards() {
+      if (hiddenActivations == null) {
+        int D = hiddenDimension();
+        hiddenActivations = new IntDoubleDenseVector(D);
+        for (int i = 0; i < D; i++) {
+          double wx = features.dot(f2h[i]);
+          double en = Math.exp(-wx);
+          double s = (1 - en) / (1 + en);
+//          double s = Math.max(0, wx);
+          hiddenActivations.add(i, s);
+        }
+        output = hiddenActivations.dot(h2o);
+      }
+      return output;
+    }
+
+    @Override
+    public void backwards(double dErr_dForwards) {
+      // Update h2o (alpha)
+      hiddenActivations.apply((i,v) -> {
+        h2o.add(i, -dErr_dForwards * v);
+        return v;
+      });
+
+      // Update f2h (beta)
+      int D = hiddenDimension();
+      features.apply((j,x) -> {
+        for (int i = 0; i < D; i++) {
+          double alpha = h2o.get(i);
+          double activation = hiddenActivations.get(i);
+          double slope = 2 * activation * (1 - activation);
+//          double slope = activation > 0 ? 1 : 0;
+          double dY_dBeta = alpha * slope * x;
+          f2h[i].add(j, -dErr_dForwards * dY_dBeta);
+        }
+        return x;
+      });
+    }
+  }
+
   /**
    * Adjoints that are implemented by a dot product between features and parameters.
    */
@@ -94,6 +155,8 @@ public interface Adjoints {
 //    private double cachedDotProd;
 //    private boolean computedCache = false;
 
+    private final IntDoubleVector gradSumSq;
+
     public Linear(IntDoubleVector theta, IntDoubleVector features) {
       if (theta == null)
         throw new IllegalArgumentException("theta cannot be null");
@@ -101,6 +164,7 @@ public interface Adjoints {
         throw new IllegalArgumentException("features cannot be null");
       this.theta = theta;
       this.features = features;
+      this.gradSumSq = new IntDoubleDenseVector();
     }
 
     @Override
@@ -115,12 +179,16 @@ public interface Adjoints {
 
     @Override
     public void backwards(double dErr_dForwards) {
-      // Ideally I would fuse these operations, but I don't think this can be
-      // done without runtime type inspection.
       IntDoubleVector update = features.copy();
-//      double l2 = update.getL2Norm();
-//      update.scale((-dErr_dForwards / l2) * getStepSize());
-      update.scale(-dErr_dForwards * getStepSize());
+
+      update.scale(-dErr_dForwards);
+//      double lr = getStepSize();
+//      update.apply((i,v) -> {
+//        double g = -dErr_dForwards * v;
+//        gradSumSq.add(i, g * g);
+//        return lr * g / (1e-9 + Math.sqrt(gradSumSq.get(i)));
+//      });
+
       theta.add(update);
     }
 
