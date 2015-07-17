@@ -5,12 +5,16 @@ import edu.jhu.hlt.tutils.MultiAlphabet;
 
 public class PosUtil {
 
-  public final long VERBS, NOUNS;
+  public final long VERBS, NOUNS, PROPER_NOUNS;
   private MultiAlphabet alph;
 
   public PosUtil(MultiAlphabet alph) {
     this.alph = alph;
     VERBS = 0
+        | (1l << alph.pos("VA"))      // Chinese
+        | (1l << alph.pos("VC"))      // Chinese
+        | (1l << alph.pos("VE"))      // Chinese
+        | (1l << alph.pos("VV"))      // Chinese
         | (1l << alph.pos("VBD"))
         | (1l << alph.pos("VBG"))
         | (1l << alph.pos("VBN"))
@@ -18,11 +22,17 @@ public class PosUtil {
         | (1l << alph.pos("VBZ"));
     // etc
     NOUNS = 0
+        | (1l << alph.pos("NR"))      // Chinese
+        | (1l << alph.pos("NT"))      // Chinese
         | (1l << alph.pos("NN"))
         | (1l << alph.pos("NNS"))
         | (1l << alph.pos("NNP"))
         | (1l << alph.pos("NNPS"));
     // etc
+    PROPER_NOUNS = 0
+        | (1l << alph.pos("NR"))      // Chinese
+        | (1l << alph.pos("NNP"))
+        | (1l << alph.pos("NNPS"));
   }
 
   public boolean matches(long mask, int pos) {
@@ -32,6 +42,10 @@ public class PosUtil {
 
   public boolean isNoun(int pos) {
     return matches(NOUNS, pos);
+  }
+
+  public boolean isProperNoun(int pos) {
+    return matches(PROPER_NOUNS, pos);
   }
 
   public boolean isVerb(int pos) {
