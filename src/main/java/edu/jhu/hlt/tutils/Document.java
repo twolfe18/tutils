@@ -577,6 +577,15 @@ public final class Document implements Serializable {
       this.goldView = goldView;
     }
 
+    @Override
+    public String toString() {
+      return "(Token " + index
+          + " word=" + getWord()
+          + " posG=" + getPosG()
+          + " posH=" + getPosH()
+          + ")";
+    }
+
     /** Use sparingly: Not always obvious which alph sub-section to use. */
     public String getWordStr() { return alph.word(word[index]); }
 
@@ -764,6 +773,21 @@ public final class Document implements Serializable {
     public boolean isLeaf() {
       assert leftChild[index] != UNINITIALIZED;
       return leftChild[index] < 0;
+    }
+
+    @Override
+    public String toString() {
+      return "(Constituent " + index
+          + " lhs=" + getLhs()
+          + " parent=" + getParent()
+          + " depth=" + getDepth()
+          + " firstToken=" + getFirstToken()
+          + " lastToken=" + getLastToken()
+          + " leftSib=" + getLeftSib()
+          + " rightSib=" + getRightSib()
+          + " leftChild=" + getLeftChild()
+          + " rightChild=" + getRightChild()
+          + ")";
     }
 
     public int getParent() { return parent[index]; }
