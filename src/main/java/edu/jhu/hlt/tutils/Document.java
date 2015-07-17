@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.ToIntFunction;
 
@@ -218,6 +219,59 @@ public final class Document implements Serializable {
     }
     return bs;
   }
+
+  /**
+   * @param needle is (first,last) tokens to match
+   * @param area is the area to search
+   * @param d
+   * @param addTo may be null, otherwise will be populated by (first,last) values found in area
+   * @param ignoreCase says if wordNoCase should be use, else word
+   * @return
+   */
+  public int stringOccurrences(IntPair needle, IntPair area, List<IntPair> addTo, boolean ignoreCase) {
+    if (needle.first > needle.second || needle.first < 0)
+      throw new IllegalArgumentException();
+    if (area.first > area.second || area.first < 0)
+      throw new IllegalArgumentException();
+    int occ = 0;
+    int w = needle.second - needle.first;
+    search:
+    for (int i = area.first; i <= area.second - w; i++) {
+      int matchingToks = 0;
+      while (matchingToks < w) {
+        int a = needle.first + matchingToks;
+        int b = i + matchingToks;
+        if (ignoreCase && getWordNocase(a) == getWordNocase(b)) {
+          assert getWordNocase(a) >= 0;
+          matchingToks++;
+        } else if (!ignoreCase && getWord(a) == getWord(b)) {
+          assert getWord(a) >= 0;
+          matchingToks++;
+        } else {
+          continue search;
+        }
+      }
+      occ++;
+      if (addTo != null)
+        addTo.add(new IntPair(i, i + w - 1));
+    }
+    return occ;
+  }
+
+  public int posOccurrences(int i, IntPair area, List<Integer> addTo, boolean gold) {
+    int occ = 0;
+    int p = gold ? getPosG(i) : getPosH(i);
+    for (int j = area.first; j <= area.second; j++) {
+      if ((gold && getPosG(j) == p)
+          || (!gold && getPosH(j) == p)) {
+        occ++;
+        if (addTo != null)
+          addTo.add(j);
+      }
+    }
+    return occ;
+  }
+
 
   /* END OF CONVENIENCE METHODS ***********************************************/
 
