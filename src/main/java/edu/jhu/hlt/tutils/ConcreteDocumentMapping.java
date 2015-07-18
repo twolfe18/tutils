@@ -1,6 +1,7 @@
 package edu.jhu.hlt.tutils;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.BiMap;
@@ -136,12 +137,12 @@ public class ConcreteDocumentMapping {
   }
 
   /**
-   * Adds the coreference labels pointed to by coref to the {@link Communication}
-   * held by this mapping. Don't do this twice!
+   * Assuming you have added {@link Constituent} -> {@link EntityMention}.UUID
+   * mappings for all of the mentions provided, add them to the {@link Communication}
+   * as a new {@link EntitySet}.
+   * Don't do this twice (mutates underlying {@link Communication})!
    */
-  public void addCorefToCommunication(Constituent coref, String toolname) {
-    if (doc != coref.getDocument())
-      throw new IllegalArgumentException();
+  public void addCorefToCommunication(List<List<Constituent>> entities, String toolname) {
     if (communication != null)
       throw new IllegalStateException("must have pointer to Communication");
 
@@ -161,25 +162,26 @@ public class ConcreteDocumentMapping {
     es.getMetadata().setTimestamp(System.currentTimeMillis() / 1000);
     es.getMetadata().setTool(toolname);
     communication.addToEntitySetList(es);
-    for (ConstituentItr entity = doc.getConstituentItr(coref.getIndex());
-        entity.isValid(); entity.gotoRightSib()) {
+    for (List<Constituent> ent : entities) {
       Entity cEnt = new Entity();
       cEnt.setUuid(UUIDFactory.newUUID());
       cEnt.setType("???");
       es.addToEntityList(cEnt);
-      for (ConstituentItr mention = doc.getConstituentItr(entity.getLeftChild());
-          mention.isValid(); mention.gotoRightSib()) {
+      for (Constituent ment : ent) {
 
         // Look up the EntityMention that this mention corresponds to.
-        Constituent key = doc.getConstituent(mention.getIndex());
-        UUID emId = items.get(key);
+        UUID emId = items.get(ment);
+        if (emId == null) {
+          throw new RuntimeException("could not find Document.Constituent -> "
+              + "EntityMention.UUID mapping for " + ment);
+        }
         cEnt.addToMentionIdList(emId);
 
         // Update/check the EntityMentionSet
         UUID emsId = em2ems.get(emId);
         if (emsId == null)
           throw new RuntimeException();
-        if (es.isSetMentionSetId())
+        if (!es.isSetMentionSetId())
           es.setMentionSetId(emsId);
         else if (!es.getMentionSetId().equals(emsId))
           throw new RuntimeException("no support for mixed EntityMentionSets");
