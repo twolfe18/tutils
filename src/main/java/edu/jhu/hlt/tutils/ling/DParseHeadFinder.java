@@ -28,11 +28,18 @@ public class DParseHeadFinder implements HeadFinder {
 
   public Function<Document, LabeledDirectedGraph> parse = d -> d.stanfordDepsBasic;
 
+  public boolean returnHeadAtAnyCost = true;
+
   public boolean debug = false;
 
   /** Returns the parse that this head finder uses */
   public LabeledDirectedGraph getParse(Document d) {
     return parse.apply(d);
+  }
+
+  public DParseHeadFinder useParse(Function<Document, LabeledDirectedGraph> parse) {
+    this.parse = parse;
+    return this;
   }
 
   public int head(Document doc, int first, int last) {
@@ -56,8 +63,11 @@ public class DParseHeadFinder implements HeadFinder {
         extHead = i;
       }
     }
-    if (extHead == -1 && !IGNORE_NO_EXT_HEAD)
+    if (extHead == -1 && !IGNORE_NO_EXT_HEAD) {
       Log.warn("no external head");
+      if (returnHeadAtAnyCost)
+        return last;
+    }
     if (possible != null) {
       if (!IGNORE_HEAD_TIES)
         Log.warn("multiple heads, breaking ties");
