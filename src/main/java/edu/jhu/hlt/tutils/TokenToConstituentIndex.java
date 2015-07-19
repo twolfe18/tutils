@@ -15,6 +15,8 @@ public class TokenToConstituentIndex {
   }
 
   public TokenToConstituentIndex(Document doc, int firstCons) {
+    if (firstCons < 0)
+      throw new IllegalArgumentException("unpopulated firstCons! " + firstCons);
     this.firstCons = firstCons;
     this.doc = doc;
     this.tok2cons = new int[doc.tokTop];

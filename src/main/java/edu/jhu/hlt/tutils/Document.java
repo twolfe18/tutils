@@ -128,7 +128,6 @@ public final class Document implements Serializable {
 
   transient TokenToConstituentIndex t2c_ptb_gold;
   public TokenToConstituentIndex getT2cPtbGold() {
-    assert cons_ptb_gold >= 0;
     if (t2c_ptb_gold == null)
       t2c_ptb_gold = new TokenToConstituentIndex(this, cons_ptb_gold);
     return t2c_ptb_gold;
@@ -136,7 +135,6 @@ public final class Document implements Serializable {
 
   transient TokenToConstituentIndex t2c_ptb_auto;
   public TokenToConstituentIndex getT2cPtbAuto() {
-    assert cons_ptb_auto >= 0;
     if (t2c_ptb_auto == null)
       t2c_ptb_auto = new TokenToConstituentIndex(this, cons_ptb_auto);
     return t2c_ptb_auto;
@@ -479,6 +477,13 @@ public final class Document implements Serializable {
       return words;
     }
 
+    /** Returns [first,last], both inclusive */
+    public IntPair getBoundaries() {
+      int f = getStart();
+      int l = (f + getWidth()) - 1;
+      return new IntPair(f, l);
+    }
+
     public Token[] getTokens() {
       int width = getWidth();
       Token[] tokens = new Token[width];
@@ -561,7 +566,8 @@ public final class Document implements Serializable {
 
 
   /** Pointer to a token */
-  public class Token extends Slice {
+  public class Token extends Slice implements Serializable {
+    private static final long serialVersionUID = -5938185870054285983L;
     protected int index;
     protected boolean goldView;   // true => posG, nerG  false => posH, nerH
 
@@ -650,6 +656,7 @@ public final class Document implements Serializable {
 
   /** For using Token like an iterator (be careful!) */
   public class TokenItr extends Token {
+    private static final long serialVersionUID = 1097136833554339301L;
 
     public TokenItr(int index) {
       super(index);
@@ -683,7 +690,8 @@ public final class Document implements Serializable {
 
 
   /** Pointer to a constituent */
-  public class Constituent extends AbstractSlice {
+  public class Constituent extends AbstractSlice implements Serializable {
+    private static final long serialVersionUID = -9031713161057564855L;
     protected int index;
     // NOTE: When this module is expanded to allow multiple constituency parses,
     // we will need to add a int[] constituents here.
@@ -848,6 +856,7 @@ public final class Document implements Serializable {
 
   /** A class for traversing and adding constituents. */
   public class ConstituentItr extends Constituent {
+    private static final long serialVersionUID = 3477578265931422237L;
 
     public ConstituentItr(int index) {
       super(index);
