@@ -139,6 +139,11 @@ public class DrofnatsHeadFinder implements HeadFinder {
       category2rules[i] = new ArrayList<>();
   }
 
+  public DrofnatsHeadFinder useGoldParse(boolean useGoldParse) {
+    this.useGoldParse = useGoldParse;
+    return this;
+  }
+
   // f=src/edu/stanford/nlp/trees/ModCollinsHeadFinder.java
   // tail -n+55 $f | head -n 87 | perl -pe 's/nonTerminalInfo.put/addRule/' | perl -pe 's/},/);\n    addRule("TODO", /g' | perl -pe 's/new String[^"]+//g' | tr '}{' ' ' | perl -pe 's/"right"/RIGHT_PATIENT/g' | perl -pe 's/"left"/LEFT_PATIENT/g' | perl -pe 's/"rightdis"/RIGHT_EAGER/g' | perl -pe 's/"leftdis"/LEFT_EAGER/g'
   public DrofnatsHeadFinder initBasicRules() {
@@ -399,14 +404,25 @@ public class DrofnatsHeadFinder implements HeadFinder {
       Log.info("finding head for " + ms);
     }
 
+    if (first == last)
+      return first;
+    assert first < last;
+
     // Get the constituent immediately dominating this token
     TokenToConstituentIndex parse = d.getT2cPtb(useGoldParse);
     int consIdx = parse.getParent(last);
     if (consIdx < 0)
       throw new RuntimeException("no node dominating token " + last);
 
+    // Find the smallest constituent that spans the entire mention
     Document.ConstituentItr root = d.getConstituentItr(consIdx);
-    while (root.getLastToken() < last) {
+    assert root.getLastToken() >= 0 : "first/last token not set?";
+    if (debug)
+      Log.info("root=" + root);
+    int biggestConsThatFitsInsideSpan = -1;
+    while (root.getFirstToken() > first) {
+      if (first <= root.getFirstToken() && root.getLastToken() <= last)
+        biggestConsThatFitsInsideSpan = root.getIndex();
       if (debug)
         Log.info("going up from: " + root.show(alph));
       root.gotoParent();
@@ -415,15 +431,62 @@ public class DrofnatsHeadFinder implements HeadFinder {
       Log.info("finding head for " + root.showSubtree(alph));
 
     // Search downward to find the head
+    int originalRoot = root.getIndex();
+    int head = -1;
     while (root != null) {
       if (debug)
         Log.info("inspecting: " + root.show(alph));
-      if (root.isLeaf()) {
-        if (debug) Log.info("leaf => returning first token");
-        return root.getFirstToken();
+      if (root.isLeaf() || root.getWidth() == 1) {
+        if (debug) Log.info("leaf => returning only token");
+        assert root.getFirstToken() == root.getLastToken();
+        head = root.getFirstToken();
+        break;
       }
       if (!head(root))
         break;
+    }
+
+    if (debug)
+      Log.info("tentative head=" + head);
+
+    // TODO A slightly better solution to this would be to "do surgery" on the
+    // parse: create a new constituent to stand in for problematic constituent
+    // (the smallest constituent which covers the span but has a head outside)
+    // with the same category and assign each of the children of the problematic
+    // constituent to be children of the new constituent.
+    // E.g. (NP [[ (PRP$ his) (NN wife) ]] (CC and) (NNS kids))
+    // => (NP' (PRP$ his) (NN wife))
+
+    // The previous search may yield a head outside of the mention, in which
+    // case we should try fall back on the biggest constituent that fit 
+    if (first <= head && head <= last) {
+      return head;
+    } else {
+      if (debug)
+        Log.info("found head outside of the given span: " + head);
+      if (originalRoot == biggestConsThatFitsInsideSpan) {
+        // Nothing we can do to recover, would just repeat the same search as above
+        if (returnHeadAtAnyCost) {
+          String ms = d.sliceL(first, last).show(alph);
+          Log.warn("could not derive head for " + ms);
+          return last;
+        }
+      } else {
+        // Start at the biggest constituent and go downwards
+        root.gotoConstituent(biggestConsThatFitsInsideSpan);
+        while (root != null) {
+          if (debug)
+            Log.info("inspecting: " + root.show(alph));
+          if (root.isLeaf() || root.getWidth() == 1) {
+            if (debug) Log.info("leaf => returning only token");
+            assert root.getFirstToken() == root.getLastToken();
+            head = root.getFirstToken();
+            break;
+          }
+          if (!head(root))
+            break;
+        }
+      }
     }
 
     if (returnHeadAtAnyCost) {
@@ -435,7 +498,7 @@ public class DrofnatsHeadFinder implements HeadFinder {
     throw new RuntimeException("couldn't find head");
   }
 
-  /** Returns false if a head is not found */
+  /** Returns false if a rules is not applied */
   public boolean head(Document.ConstituentItr cons) {
     if (!cons.isValid())
       throw new IllegalArgumentException();
@@ -486,6 +549,10 @@ public class DrofnatsHeadFinder implements HeadFinder {
   }
 
   public void addRule(int lhs, int direction, int... values) {
+    if (lhs >= category2rules.length) {
+      throw new RuntimeException("there should not be large values of LHS="
+          + lhs + ", did you call alph.cfg when you shouldn't have?");
+    }
     category2rules[lhs].add(new Rule(direction, values));
   }
 
