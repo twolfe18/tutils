@@ -1,11 +1,9 @@
 package edu.jhu.hlt.tutils;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 
 import edu.jhu.hlt.concrete.AnnotationMetadata;
 import edu.jhu.hlt.concrete.Communication;
@@ -19,6 +17,7 @@ import edu.jhu.hlt.concrete.UUID;
 import edu.jhu.hlt.concrete.uuid.UUIDFactory;
 import edu.jhu.hlt.tutils.Document.Constituent;
 import edu.jhu.hlt.tutils.Document.ConstituentItr;
+import edu.jhu.prim.map.IntObjectHashMap;
 
 /**
  * Maintains a mapping between items in a {@link Document} and a {@link Communication}.
@@ -26,15 +25,19 @@ import edu.jhu.hlt.tutils.Document.ConstituentItr;
  * NOTE: Not for storing {@link Sentence} UUIDs, use {@link Tokenization} UUIDs
  * instead.
  *
- * NOTE: Be careful about adding {@link ConstituentItr}s, as they are mutable.
+ * NOTE: You don't need to be careful about adding {@link ConstituentItr}s, as
+ * internally we only store ints, which are read and frozen upon adding them to
+ * this mapping.
  *
  * @author travis
  */
-public class ConcreteDocumentMapping {
+public class ConcreteDocumentMapping implements Serializable {
+  private static final long serialVersionUID = -1214073946933136260L;
 
   // There are many items that are indexed by UUIDs in Concrete and Constituents
   // in tutils.Document, e.g. EntityMention, Entity, Tokenization, Section, etc
-  private BiMap<Document.Constituent, UUID> items;
+  private IntObjectHashMap<UUID> c2u;
+  private Map<UUID, Integer> u2c;
 
   // TODO add Map<UUID, Class> types; ?
 
@@ -54,7 +57,8 @@ public class ConcreteDocumentMapping {
   public ConcreteDocumentMapping(Communication c, Document doc) {
     if (c == null)
       throw new IllegalArgumentException();
-    this.items = HashBiMap.create();
+    this.c2u = new IntObjectHashMap<>();
+    this.u2c = new HashMap<>();
     this.communication = c;
     this.doc = doc;
   }
@@ -63,7 +67,8 @@ public class ConcreteDocumentMapping {
   public ConcreteDocumentMapping(UUID communicationUUID, Document doc) {
     if (communicationUUID == null)
       throw new IllegalArgumentException();
-    this.items = HashBiMap.create();
+    this.c2u = new IntObjectHashMap<>();
+    this.u2c = new HashMap<>();
     this.communicationUUID = communicationUUID;
     this.doc = doc;
   }
@@ -95,7 +100,7 @@ public class ConcreteDocumentMapping {
   }
 
   public int size() {
-    return items.size();
+    return c2u.size();
   }
 
   /**
@@ -103,7 +108,12 @@ public class ConcreteDocumentMapping {
    * @param id should NOT be a {@link Sentence} UUID!
    */
   public void put(Document.Constituent cons, UUID id) {
-    items.put(cons, id);
+//    items.put(cons.getIndex(), id);
+    int c = cons.getIndex();
+    UUID oldU = this.c2u.put(c, id);
+    Integer oldC = this.u2c.put(id, c);
+    if (oldU != null || oldC != null)
+      throw new RuntimeException("duplicate c=" + c + " u=" + id + " cOld=" + oldC + " uOld=" + oldU);
   }
 
   /**
@@ -111,11 +121,17 @@ public class ConcreteDocumentMapping {
    * @return
    */
   public Document.Constituent get(UUID id) {
-    return items.inverse().get(id);
+    Integer c = u2c.get(id);
+    if (c == null)
+      throw new RuntimeException("no entry for uuid=" + id);
+    return doc.getConstituent(c);
   }
 
   public UUID get(Document.Constituent cons) {
-    return items.get(cons);
+    UUID u = c2u.get(cons.getIndex());
+    if (u == null)
+      throw new RuntimeException("no entry for cons=" + cons.getIndex());
+    return u;
   }
 
   /**
@@ -170,7 +186,7 @@ public class ConcreteDocumentMapping {
       for (Constituent ment : ent) {
 
         // Look up the EntityMention that this mention corresponds to.
-        UUID emId = items.get(ment);
+        UUID emId = get(ment);
         if (emId == null) {
           throw new RuntimeException("could not find Document.Constituent -> "
               + "EntityMention.UUID mapping for " + ment);
