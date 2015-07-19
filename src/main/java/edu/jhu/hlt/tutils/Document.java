@@ -95,6 +95,7 @@ public final class Document implements Serializable {
   public int cons_section = NONE;       // lhs = section index
 
   // top level is linked list of cparses for sentences
+  // NOTE, these trees do not contain words and their leaves have lhs=POS tag
   public int cons_ptb_gold = NONE;    // e.g. CoNLL/PTB gold parse
   public int cons_ptb_auto = NONE;    // e.g. Stanford cparse
 

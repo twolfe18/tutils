@@ -181,9 +181,10 @@ public class ConcreteToDocument {
 
   public void readConcreteStanford() {
     corefToolAuto = "Stanford Coref";
-    dparseBasicTool = ConcreteToDocument.STANFORD_DPARSE_BASIC;
-    dparseColTool = ConcreteToDocument.STANFORD_DPARSE_COLL;
-    dparseColCCTool = ConcreteToDocument.STANFORD_DPARSE_COLL_CC;
+    cparseToolAuto = "Stanford CoreNLP";
+    dparseBasicTool = STANFORD_DPARSE_BASIC;
+    dparseColTool = STANFORD_DPARSE_COLL;
+    dparseColCCTool = STANFORD_DPARSE_COLL_CC;
     posToolAuto = STANFORD_POS;
     nerToolAuto = STANFORD_NER;
     lemmaTool = STANFORD_LEMMA;
@@ -421,6 +422,14 @@ public class ConcreteToDocument {
     }
   }
 
+  public static boolean wordsAreInTheTree(Parse p) {
+    if (STANFORD_CPARSE.test(p))
+      return true;
+    if ("conll-2011 parse".equalsIgnoreCase(p.getMetadata().getTool()))
+      return false;
+    throw new RuntimeException("unknown for " + p.getMetadata());
+  }
+
   /**
    * Add the constituents in the given {@link Parse} to the {@link Document}
    * using the {@link ConstituentItr}.
@@ -438,6 +447,9 @@ public class ConcreteToDocument {
       Map<ConstituentRef, Integer> constituentIndices,
       MultiAlphabet alph) {
 
+    if (debug_cons)
+      Log.info("converting " + p);
+
     // Sanity check: Constituents shouldn't really have ids, they should work
     // only on indices.
     if (REWRITE_CONSTITUENT_IDS_TO_INDICES) {
@@ -452,6 +464,13 @@ public class ConcreteToDocument {
     BitSet isNotChild = new BitSet();   // constituent indices
     int adds = 0;
 
+    /*
+     * TODO If words are in the tree, then do not add leave Constituents.
+     * POS tags should stay in the tree, as they could in principle differ
+     * from posH.
+     */
+    boolean hasWords = wordsAreInTheTree(p);
+
     // Build the constituents and mapping between them
     int nCons = p.getConstituentListSize();
     int[] ccon2dcon = new int[nCons];
@@ -460,20 +479,41 @@ public class ConcreteToDocument {
     for (edu.jhu.hlt.concrete.Constituent ccon : p.getConstituentList()) {
       if (debug_cons)
         Log.info("ccon=" + ccon);
+
+      // Skip over leaf/word constituents
+      if (hasWords && ccon.getChildListSize() == 0)
+        continue;
+
+      String t = "???";
+      if (!ccon.isSetTag())
+        Log.warn("no tag for " + ccon + " in parse=" + p.getMetadata());
+      else
+        t = ccon.getTag();
+      if (t.length() >= 7)
+        Log.warn("long pos tag, no? " + ccon.getTag());
+      if (!t.toUpperCase().equals(t)) {
+        // Words should never be tags! There should be a small set of CFG/POS
+        // tags (which are all upper case, sometimes with dashes)!
+        Log.warn("did you put words into the pos tags? " + ccon + " parser=" + p.getMetadata());
+      }
       assert ccon.isSetStart() == ccon.isSetEnding();
 
       adds++;
       Constituent cons = doc.newConstituent();
       isNotChild.set(cons.getIndex(), true);
-      cons.setLhs(alph.cfg(ccon.getTag()));
+      cons.setLhs(alph.cfg(t));
       cons.setParent(Document.NONE);      // Will be over-written later
       cons.setOnlyChild(Document.NONE);   // Will be over-written later
+
+      // Set first and last token if available
       if (ccon.isSetStart()) {
         if (debug_cons)
           Log.info("setting lastToken[" + cons.getIndex() + "]=" + (tokenOffset + ccon.getEnding() - 1));
         cons.setFirstToken(tokenOffset + ccon.getStart());
         cons.setLastToken(tokenOffset + ccon.getEnding() - 1);
       }
+
+      // Set concrete -> tutils mapping
       assert cons.getIndex() >= 0;
       if (ccon2dcon[ccon.getId()] >= 0)
         throw new RuntimeException("loopy parse? " + p);
@@ -493,6 +533,14 @@ public class ConcreteToDocument {
       int prevChildIdx = Document.NONE;
       for (int child : ccon.getChildList()) {
         int childIdx = ccon2dcon[p.getConstituentList().get(child).getId()];
+
+        // child must have been a leaf
+        if (hasWords && childIdx < 0) {
+          assert p.getConstituentList().get(child).getChildListSize() == 0;
+          continue;
+        }
+
+        assert parentIdx != childIdx;
         isNotChild.set(childIdx, false);
         Document.Constituent c = doc.getConstituent(childIdx);
         c.setParent(parentIdx);
@@ -501,14 +549,16 @@ public class ConcreteToDocument {
           doc.getConstituent(prevChildIdx).setRightSib(childIdx);
         if (parent.getLeftChild() < 0) {
           if (debug_cons) {
-            Log.info("setting " + parent.show(alph) + ".firstChild=" + c.show(alph));
+            Log.info("setting parent=" + parentIdx + ".firstChild=" + childIdx
+                + " " + parent.show(alph) + " -> " + c.show(alph));
           }
           parent.setLeftChild(childIdx);
         }
-        parent.setRightChild(childIdx);
         if (debug_cons) {
-          Log.info("setting " + parent.show(alph) + ".rightChild=" + c.show(alph));
+          Log.info("setting parent=" + parentIdx + ".lastChild=" + childIdx
+              + " " + parent.show(alph) + " -> " + c.show(alph));
         }
+        parent.setRightChild(childIdx);
         prevChildIdx = childIdx;
       }
       if (prevChildIdx >= 0)
