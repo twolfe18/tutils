@@ -15,6 +15,7 @@ package edu.jhu.hlt.tutils.scoring;
  * @author travis
  */
 public class LossAugmentedParams<S, A> implements Params<S, A> {
+  private static final long serialVersionUID = 8645861300493944455L;
 
   private boolean includeLoss;
   private final Params<S, A> modelScore;
