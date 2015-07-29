@@ -9,7 +9,7 @@ public class IntTrip {
     this.first = first;
     this.second = second;
     this.third = third;
-    this.hash = first + 31 * (second + 31 * third);
+    this.hash = (second << 20) ^ (first << 10) ^ third;
   }
 
   @Override
