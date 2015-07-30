@@ -36,6 +36,9 @@ public class IntPair {
     return "(" + first + ", " + second + ")";
   }
 
+  /**
+   * Compares on first first, then second. Lower values appear first.
+   */
   public static Comparator<IntPair> ASCENDING = new Comparator<IntPair>() {
     @Override
     public int compare(IntPair o1, IntPair o2) {
@@ -50,6 +53,10 @@ public class IntPair {
       return 0;
     }
   };
+
+  /**
+   * Compares on first first, then second. Higher values appear first.
+   */
   public static Comparator<IntPair> DESCENDING = new Comparator<IntPair>() {
     @Override
     public int compare(IntPair o1, IntPair o2) {
