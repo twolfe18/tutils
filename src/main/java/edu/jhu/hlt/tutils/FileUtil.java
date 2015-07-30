@@ -47,17 +47,11 @@ public class FileUtil {
   public static void copy(File sourceFile, File destFile) throws IOException {
     if (!destFile.exists())
       destFile.createNewFile();
-    FileChannel source = null;
-    FileChannel destination = null;
-    try {
-      source = new FileInputStream(sourceFile).getChannel();
-      destination = new FileOutputStream(destFile).getChannel();
-      destination.transferFrom(source, 0, source.size());
-    } finally {
-      if (source != null)
-        source.close();
-      if (destination != null)
-        destination.close();
+    try (FileInputStream source = new FileInputStream(sourceFile);
+        FileChannel sChan = source.getChannel();
+        FileOutputStream destination = new FileOutputStream(destFile);
+        FileChannel dChan = destination.getChannel()) {
+      dChan.transferFrom(sChan, 0, sChan.size());
     }
   }
 

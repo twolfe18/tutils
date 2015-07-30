@@ -15,6 +15,7 @@ public class NetworkSerializableParams<T extends Serializable>
     this.params = params;
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public void set(InputStream data) {
     try {

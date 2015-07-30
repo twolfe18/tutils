@@ -155,7 +155,7 @@ public interface Adjoints {
 //    private double cachedDotProd;
 //    private boolean computedCache = false;
 
-    private final IntDoubleVector gradSumSq;
+//    private final IntDoubleVector gradSumSq;
 
     public Linear(IntDoubleVector theta, IntDoubleVector features) {
       if (theta == null)
@@ -164,7 +164,7 @@ public interface Adjoints {
         throw new IllegalArgumentException("features cannot be null");
       this.theta = theta;
       this.features = features;
-      this.gradSumSq = new IntDoubleDenseVector();
+//      this.gradSumSq = new IntDoubleDenseVector();
     }
 
     @Override
