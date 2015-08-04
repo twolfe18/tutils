@@ -1,5 +1,7 @@
 package edu.jhu.hlt.tutils;
 
+import edu.jhu.hlt.tutils.Document.Token;
+
 /**
  * Provides many things that you can test about a {@link Document}. Note that
  * this tool is designed to let you run as many or as few checks as fits your
@@ -100,5 +102,28 @@ public class DocumentTester {
       }
     }
     return good;
+  }
+
+  public static Document getMockDocument() {
+    return getMockDocument(new MultiAlphabet());
+  }
+  public static Document getMockDocument(MultiAlphabet alph) {
+    Document d = new Document("mock-doc", 0, alph);
+    String[] wp = new String[] {
+        "Papa", "NN",
+        "ate", "VBD",
+        "the", "DT",
+        "caviar", "NN",
+        "with", "IN",
+        "the", "DT",
+        "spoon", "NN",
+        ".", "."
+    };
+    for (int i = 0; i < wp.length; i += 2) {
+      Token t = d.newToken();
+      t.setWord(alph.word(wp[i]));
+      t.setPosH(alph.pos(wp[i+1]));
+    }
+    return d;
   }
 }

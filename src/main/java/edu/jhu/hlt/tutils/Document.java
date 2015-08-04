@@ -167,6 +167,18 @@ public final class Document implements Serializable {
 
   /* CONVENIENCE METHODS ******************************************************/
 
+  private transient int beforeDoc = -1, afterDoc = -1;
+  public int beforeDoc() {
+    if (beforeDoc < 0)
+      beforeDoc = alph.word("</S>");
+    return beforeDoc;
+  }
+  public int afterDoc() {
+    if (afterDoc < 0)
+      afterDoc = alph.word("<S>");
+    return afterDoc;
+  }
+
   /**
    * Returns a map from (firstToken,lastToken) to constituentIndex for all
    * constituents in the link list pointed to by firstConsIdx. This assumes that
