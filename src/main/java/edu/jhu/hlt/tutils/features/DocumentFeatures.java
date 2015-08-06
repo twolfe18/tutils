@@ -10,7 +10,7 @@ import edu.jhu.hlt.tutils.IntPair;
 import edu.jhu.hlt.tutils.IntTrip;
 
 /**
- * Features for things in a document.
+ * Stores features for things in a document.
  *
  * @author travis
  */
@@ -124,27 +124,26 @@ public class DocumentFeatures<T extends Serializable> implements Serializable {
    */
 
   public static void main(String[] args) {
-    int numFeats = 20;
-    int numLabels = 2;
     TemplateManager tm = TemplateManager.getInstance();
 
     TemplateTree root = new TemplateTree(tm.get("word[0]"));
 
     TemplateTree t2 = new TemplateTree(tm.get("pos[-1]"));
     root.addChild(t2);
-//    t2.addChild(new IndexFlattener());
-    t2.addChild(new IndexFlattener.Params(numFeats, numLabels));
+    t2.addChild(new Features());
 
     TemplateTree t3 = new TemplateTree(tm.get("pos[0]"));
     root.addChild(t3);
-//    t3.addChild(new IndexFlattener());
-    t3.addChild(new IndexFlattener.Params(numFeats, numLabels));
+    t3.addChild(new Features());
+
+    TemplateTree t4 = new TemplateTree(tm.get("pos[-1]"));
+    t2.addChild(t4);
+    t4.addChild(new Features());
 
     Document doc = DocumentTester.getMockDocument();
-    Context ctx = new Context(doc, numLabels, true);
+    Context ctx = new Context(doc, 1);
     ctx.token = 2;
     root.apply(ctx);
-    root.unapply(ctx);
     System.out.println(ctx);
   }
 

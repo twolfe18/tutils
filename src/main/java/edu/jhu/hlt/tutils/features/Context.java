@@ -4,10 +4,12 @@ import java.util.ArrayDeque;
 import java.util.Arrays;
 
 import edu.jhu.hlt.tutils.Document;
+import edu.jhu.prim.vector.IntDoubleUnsortedVector;
+import edu.jhu.prim.vector.IntDoubleVector;
 
 /**
  * Holds the input to and the output from a few templates. This is the only
- * argument to a feature function and means that they don't need to return
+ * argument to a {@link Template} function meaning they don't need to return
  * anything.
  *
  * @author travis
@@ -21,20 +23,15 @@ public class Context {
   public int cons;
 
   // Output
-  // These are currently un-named registers for passing information from one
-  // Template to another. Right now, Templates don't know about each other, but
-  // this is somewhat limiting. The only way that templates can talk to each
-  // other is by "cancelling" an extraction.
-  //
-  // This is the ONLY THING that templates may safely mutate.
-  // See TemplateTree for the reason: we will need to "roll back" template
-  // applications in order to support a tree of templates (as opposed to a list).
-  private int numTemplates;    // if you set this to -1, this extraction is "cancelled" or "annihilated"
-//  private int[] templateIndices;    // NOT ACTUALLY NECESSARY :) see IndexFlattener, the key is to walk up the TemplateTree to determine what template added a value
-  private int[] templateValues;
+  // See TemplateTree for how these are managed
+  public int flatIndex = 0;         // index of product of templates
+  public int templateValueBuffer;   // return value from Template.accept
 
-  // See IndexFlattener
-  private int flatIndex = -1;
+  // These are needed in order to "undo" adds/updates to flatIndex, which is
+  // only needed when Templates are put into a tree.
+  private int[] templateValues;
+  private int[] templateRanges;
+  private int numTemplates;    // if you set this to -1, this extraction is "cancelled" or "annihilated"
 
   // The ultimate goal of a context is to arrive at a score for some labels/actions.
   // There should be a special sub-class of Templates which read information out
@@ -44,7 +41,6 @@ public class Context {
   // This is basically a log off additions to scores used for gradient updates.
   // Note that this is not even needed for prediction.
   // Set this to null for just prediction and initialize to signal that features should recorded
-//  private List<Extraction> features;
   private ArrayDeque<Extraction> feats;
 
   // How "muted" should this feature/extraction be. This must be >= 0.
@@ -56,12 +52,13 @@ public class Context {
   // regularization) or larger (less regularization) values.
   double muting;
 
-  public Context(Document doc, int numLabels, boolean recordScoreUpdates) {
+  public Context(Document doc, int numLabels) {
     clear();
     this.doc = doc;
     this.scores = new double[numLabels];
-    if (recordScoreUpdates)
-      this.feats = new ArrayDeque<>();
+    this.feats = new ArrayDeque<>();
+    templateValues = new int[DEFAULT_TEMPLATE_CAPACITY];
+    templateRanges = new int[DEFAULT_TEMPLATE_CAPACITY];
   }
 
   public void clear() {
@@ -69,17 +66,31 @@ public class Context {
     token = Document.UNINITIALIZED;
     cons = Document.UNINITIALIZED;
     numTemplates = 0;
-    templateValues = new int[DEFAULT_TEMPLATE_CAPACITY];
     if (feats != null)
       feats.clear();
     if (scores != null)
       Arrays.fill(scores, 0);
   }
 
+  public ArrayDeque<Extraction> getExtractions() {
+    return feats;
+  }
+
+  public IntDoubleVector getExtractionsAsIDV() {
+    int n = feats.size();
+    IntDoubleUnsortedVector fv = new IntDoubleUnsortedVector(n);
+    for (Extraction e : feats) {
+      int x = (int) e.x;
+      fv.add(x, 1);
+    }
+    return fv;
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("(Context doc=" + doc.getId() + "\n");
+    sb.append("  templateValueBuffer=" + templateValueBuffer + "\n");
     if (flatIndex >= 0)
       sb.append("  flatIndex=" + flatIndex + "\n");
     if (token >= 0)
@@ -96,18 +107,9 @@ public class Context {
     numTemplates = -1;
   }
 
-  // TODO isZero?
+  // TODO rename to isZero?
   public boolean isViable() {
     return numTemplates >= 0;
-  }
-
-  public void setFlatIndex(int flatIndex) {
-    assert flatIndex >= 0;
-    this.flatIndex = flatIndex;
-  }
-
-  public void clearFlatIndex() {
-    this.flatIndex = -1;
   }
 
   public int getFlatIndex() {
@@ -115,30 +117,20 @@ public class Context {
     return flatIndex;
   }
 
-  public int numTemplates() {
-    assert numTemplates >= 0;
-    return numTemplates;
-  }
-
-  public int get(int templateIndex) {
-    assert templateIndex < numTemplates;
-    return templateValues[templateIndex];
-  }
-
-  public int getLast() {
-    assert numTemplates > 0;
-    return templateValues[numTemplates - 1];
-  }
-
-  public void add(int templateValue) {
+  public void add(int templateValue, int templateRange) {
+    assert templateValue < templateRange
+      : "templateValue=" + templateValue + " templateRange=" + templateRange;
+    flatIndex = templateValue + templateRange * flatIndex;
     templateValues[numTemplates] = templateValue;
+    templateRanges[numTemplates] = templateRange;
     numTemplates++;
   }
 
-  /** Undoes an add */
-  public void rollback() {
+  public void unAdd() {
     assert numTemplates > 0;
     numTemplates--;
+    flatIndex -= templateValues[numTemplates];
+    flatIndex /= templateRanges[numTemplates];
   }
 
   /**
@@ -159,17 +151,6 @@ public class Context {
     scores[e.y] -= e.z;
     return e;
   }
-
-//  /** Only call this once per {@link Template#accept(Context)} */
-//  public void set(int template, int value) {
-//    if (numTemplates < 0) {
-//      assert false : "check first?";
-//      return;
-//    }
-//    templateIndices[numTemplates] = template;
-//    templateValues[numTemplates] = value;
-//    numTemplates++;
-//  }
 
   // i.e. a feature/template value
   public static class Extraction {

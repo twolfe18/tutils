@@ -3,37 +3,30 @@ package edu.jhu.hlt.tutils.features;
 import edu.jhu.prim.tuple.Pair;
 
 /**
- * "Commits" a template into the feature vector. Does so by resolving int[] -> int.
+ * Semantics need to be clarified, but the primary goal of this class is to move
+ * {@link Context#flatIndex} into {@link Context#feats}. If no learning is being
+ * preformed, then this can be replaced with just reading from {@link
+ * Context#flatIndex}, looking up a weight, and adding to {@link
+ * Context#scores}.
+ *
+ * @author travis
  */
-public class IndexFlattener extends TemplateM {
+public class Features extends TemplateM {
   private static final long serialVersionUID = 1618078792691007876L;
 
   @Override
   public void apply(Context c) {
-    // Walk up from this node up the TemplateTree and resolve each template
-    // value to a single int.
-    int idx = 1;
-    int i = c.numTemplates();
-    for (TemplateM node = parent; node != null; node = node.parent) {
-      int r;
-      if (node instanceof TemplateTree)
-        r = ((TemplateTree) node).range;
-      else
-        throw new RuntimeException();
-      i--;
-      int x = c.get(i);
-      idx = x + r * idx;
-    }
-    assert i == 0 : "i=" + i;
-    // Add this value to the feature vector
-    c.setFlatIndex(idx);
+    int x = c.getFlatIndex();
+    int y = 0;
+    double z = Math.exp(-c.muting);
+    c.updateLabelScore(x, y, z);
   }
 
   @Override
   public void unapply(Context c) {
-    c.clearFlatIndex();
+    // Doesn't unapply because you want to keep the features stored in Context
+    //c.unUpdateLabelScore();
   }
-
 
   /**
    * Read IntDoubleVector and set scores.
@@ -47,7 +40,7 @@ public class IndexFlattener extends TemplateM {
    * 2) having a global weight set (like below) as well as weights for each domain!
    * 3) Object x in updateLabelScore will be (domain,featureIndex)
    */
-  public static class Params extends IndexFlattener {
+  public static class Params extends Features {
     private static final long serialVersionUID = -6279675913451848033L;
 
     private double[][] weights;   // indexed by [x][y]
@@ -59,7 +52,6 @@ public class IndexFlattener extends TemplateM {
     @Override
     public void apply(Context c) {
       // Add features to c
-      super.apply(c);
       int featureIndex = c.getFlatIndex();
       double m = Math.exp(-c.muting);
       // Used for gradients
@@ -74,7 +66,6 @@ public class IndexFlattener extends TemplateM {
     @Override
     public void unapply(Context c) {
       c.unUpdateLabelScore();
-      super.unapply(c);
     }
   }
 }

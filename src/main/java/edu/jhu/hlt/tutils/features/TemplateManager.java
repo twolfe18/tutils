@@ -6,15 +6,11 @@ import java.util.Map;
 /**
  * Supposed to be a singleton which holds all the features in the system.
  *
- * PROPOSAL: There is a singleton instance FeatureManager, but anyone may
- * add templates/features to it. This will be useful if there is some setup
+ * PROPOSAL: There is a singleton instance {@link TemplateManager}, but anyone
+ * may add templates/features to it. This will be useful if there is some setup
  * work to be done to create a template (e.g. read in a file into a data
- * structure) which may not be appropriate to run as a static initializer
- * every time the class is loaded.
- *
- * TODO Should there be many instances of this where one is the "master"
- * instance which has all of the features/templates, and then you "sub-select"
- * the features/templates you want?
+ * structure) which may not be appropriate to run as a static initializer every
+ * time the class is loaded.
  *
  * @author travis
  */
@@ -53,6 +49,7 @@ public class TemplateManager {
     for (int i = -3; i <= 3; i++) {
       final int offset = i;
       SINGLETON.add(new Template("pos[" + i + "]") {
+        private static final long serialVersionUID = 4085281169172438735L;
         @Override
         public void accept(Context c) {
           if (c.token < 0) {
@@ -66,11 +63,12 @@ public class TemplateManager {
               p = c.doc.afterDoc();
             else
               p = c.doc.getPosH(c.token);
-            c.add(p);
+            c.templateValueBuffer = p;
           }
         }
       });
       SINGLETON.add(new Template("word[" + i + "]") {
+        private static final long serialVersionUID = 7675880098705084864L;
         @Override
         public void accept(Context c) {
           if (c.token < 0) {
@@ -84,7 +82,7 @@ public class TemplateManager {
               p = c.doc.afterDoc();
             else
               p = c.doc.getWord(c.token);
-            c.add(p);
+            c.templateValueBuffer = p;
           }
         }
       });

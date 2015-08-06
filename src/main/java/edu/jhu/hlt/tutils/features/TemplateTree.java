@@ -3,76 +3,75 @@ package edu.jhu.hlt.tutils.features;
 import java.util.ArrayList;
 import java.util.List;
 
-/*
- * I had some fleeting ambition of having a Template choose which child to
- * recuse onto, but I think this is not well defined, or at least it conflicts
- * with how I have been using Context. We should recurse on all children. If
- * that means that TemplateTree = LinkedList<Template>, then so be it. But
- * there are nice ways to build trees based on shared prefixes, see my notes
- * lower.
+/**
+ * A tree of {@link Template}s, where every path from root to a leaf represents
+ * a product of the {@link Template}s on the path.
+ *
+ * @author travis
  */
 public class TemplateTree extends TemplateM {
   private static final long serialVersionUID = 868342855114908161L;
 
-  protected Template template;
+  protected TemplateTree parent;
   protected List<TemplateM> children;
-
-  // How many unique values can the sub-tree rooted at this node take on?
-  // TODO I think this may not make sense. This seems like this constrains me
-  // to stay within the framework of "every TemplateTree evaluates to an int".
-  // A lot of the interesting stuff I have been speculating about (e.g. having
-  // a TemplateTree extract features for a set of labels) do not fit into this
-  // paradigm.
-  // TODO Sometimes you will want to have this (we do just spit out an int and
-  // we want to know how many doubles to reserve). In this case we could just
-  // have a sub-class that has this field?
-  protected int range;
-
-  // Set by a superviser of this tree to avoid collisions. Related to range.
-  // TODO Do I need this? IndexFlattener doesn't use this.
-  protected int offset;
+  protected Template template;
+  protected int templateRange;
 
   public TemplateTree(Template t) {
     if (t == null)
       throw new IllegalArgumentException("null Template");
     this.template = t;
-    this.range = 0;
     this.children = new ArrayList<>();
   }
 
-  public void addChild(TemplateM tt) {
-    if (tt.parent != null)
-      throw new IllegalArgumentException();
-    tt.parent = this;
-    this.children.add(tt);
+  @Override
+  public String toString() {
+    return "(TemplateTree " + template.name
+        + " templateRange=" + templateRange
+        + " numChildren=" + children.size() + ")";
+  }
+
+  public void addChild(TemplateM t) {
+    if (t instanceof TemplateTree) {
+      TemplateTree tt = (TemplateTree) t;
+      if (tt.parent != null)
+        throw new IllegalArgumentException();
+      tt.parent = this;
+    }
+    this.children.add(t);
   }
 
   @Override
   public void apply(Context c) {
-    // This will extract some piece of a feature and store it in Context
+    // This sets Context.templateValueBuffer
     template.accept(c);
     if (!c.isViable())
       return;
+    int x = c.templateValueBuffer;
+    if (x >= templateRange)
+      templateRange = x + 1;
+    int Nc = children.size();
+    int R = templateRange * Nc;
+    for (int ci = 0; ci < Nc; ci++) {
+      // Each child needs to see a different value
+      c.add(x + ci * templateRange, R);
 
-    // Update range
-    int tv = c.getLast();
-    if (tv >= range)
-      range = tv + 1;
-
-    for (TemplateM child : children) {
       // For each child, let them see the piece that was extracted and do
       // something with it like lookup a weight and update Context.
       // NOTE: It is assumed that these children will never re-write the
       // information extracted earlier. I don't think I need do-undo semantics
       // to enforce this... hopefully.
+      TemplateM child = children.get(ci);
       child.apply(c);
       if (c.isViable())
         child.unapply(c);
+
+      // Pairs with the add at the top of the loop
+      c.unAdd();
     }
   }
 
   @Override
   public void unapply(Context c) {
-    c.rollback();
   }
 }
