@@ -307,7 +307,7 @@ public class LabeledDirectedGraph implements Serializable {
      * sentence).
      * @param n is the length of the sentence/tokenization. Since a dependency
      * parse need not (necessarily) cover all the tokens, this is required.
-     * @param root must be >= n (and thus >= 0), and is the number used to denote
+     * @param root must be &ge; n (and thus &ge; 0), and is the number used to denote
      * the root node. Should be greater than any other valid node index.
      * @param offset is the 0-index of the first token in the {@link DependencyParse}
      * (concrete uses sentence-specific indexes, this uses document/global indices).

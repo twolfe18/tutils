@@ -14,7 +14,7 @@ import edu.jhu.hlt.tutils.Timer;
 
 /**
  * Similar to a disk-backed SSTable, but where the keys are strings and the
- * values are of type {@param T}.
+ * values are of type T.
  *
  * TODO add support for custom serialization via {@link DataOutputStream}
  * TODO add support for locality-sensitive hash functions (cache last few deserialize calls)
