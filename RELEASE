@@ -1,0 +1,26 @@
+
+### maven deploy + gpg plugin
+# Make sure pom.xml doesn't isn't a SNAPSHOT version, do whatever git
+# tagging/committing you're going to do, and then:
+mvn deploy -Prelease
+
+
+
+
+
+### maven-release-plugin way of doing things
+# NOTE: I had problems with this: it kept trying to release SNAPSHOT versions
+# even though I was telling it to do a full release.
+
+mvn release:prepare
+mvn -Darguments=-Dmaven.javadoc.skip=true -Prelease release:perform
+
+# You can go backwards with
+mvn release:clean
+# but this will not un-do everything it did, e.g. change from SNAPSHOT to non-SNAPSHOT in your pom.xml file
+
+# If you screw up and need to un-do the tags
+git tag -d tutils-1.0.0                   # local
+git push origin :refs/tags/tutils-1.0.0   # remote
+
+

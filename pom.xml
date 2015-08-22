@@ -4,6 +4,9 @@
   <groupId>edu.jhu.hlt</groupId>
   <artifactId>tutils</artifactId>
   <version>1.0.0</version>
+  <name>Travis' Utils</name>
+  <description>Utility code for high performance NLP</description>
+  <url>https://gitlab.hltcoe.jhu.edu/twolfe/tutils</url>
 
   <developers>
     <developer>
@@ -13,6 +16,15 @@
       <organization>JHU HLTCOE</organization>
     </developer>
   </developers>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+      <comments>A business-friendly OSS license</comments>
+    </license>
+  </licenses>
 
   <scm>
     <connection>scm:git:https://gitlab.hltcoe.jhu.edu/twolfe/tutils.git</connection>
@@ -62,20 +74,6 @@
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-gpg-plugin</artifactId>
-        <version>1.6</version>
-        <executions>
-          <execution>
-            <id>sign-artifacts</id>
-            <phase>verify</phase>
-            <goals>
-              <goal>sign</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -185,6 +183,10 @@
                 <goals>
                   <goal>sign</goal>
                 </goals>
+                <configuration>
+                  <keyname>${gpg.keyname}</keyname>
+                  <passphraseServerId>${gpg.keyname}</passphraseServerId>
+                </configuration>
               </execution>
             </executions>
           </plugin>
@@ -204,17 +206,23 @@
       </build>
       <!-- For deploying to Maven Central -->
       <distributionManagement>
-	  	<!--
+        <!--
         <snapshotRepository>
           <id>ossrh</id>
           <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </snapshotRepository>
-		-->
+        -->
         <repository>
           <id>ossrh</id>
           <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
       </distributionManagement>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <gpg.keyname>4BD57398</gpg.keyname>
+      </properties>
     </profile>
   </profiles>
 
