@@ -36,6 +36,19 @@ public class OrderStatistics<T> extends ArrayList<T> {
     return super.add(item);
   }
 
+  /*
+   * NOTE: This mehtod is not safe and will throw an Exception if T doesn't
+   * implement {@link Number}
+  public double getMean() {
+    double s = 0;
+    for (T t : this) {
+      Number x = (Number) t;
+      s += x.doubleValue();
+    }
+    return s / size();
+  }
+   */
+
   public List<T> getOrders() {
     return getOrders(DEFAULT_ORDERS, null);
   }
@@ -49,6 +62,8 @@ public class OrderStatistics<T> extends ArrayList<T> {
   }
 
   public List<T> getOrders(List<Double> orders, Comparator<? super T> cmp) {
+    if (orders.size() > size())
+      throw new IllegalArgumentException();
     if (!sorted)
       this.sort(cmp);
     List<T> ret = new ArrayList<>();
