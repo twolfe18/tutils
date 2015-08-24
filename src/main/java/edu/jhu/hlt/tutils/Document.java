@@ -365,7 +365,6 @@ public final class Document implements Serializable {
   }
 
   public String getWordStr(int tokenIndex) { return alph.word(word[tokenIndex]); }
-  public String getPosStr(int tokenIndex) { return alph.pos(posG[tokenIndex]); }
 
   public int getWord(int tokenIndex) { return word[tokenIndex]; }
   public int getWordNocase(int tokenIndex) { return wordNocase[tokenIndex]; }
