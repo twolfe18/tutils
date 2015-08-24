@@ -4,5 +4,5 @@ jar:
 	mvn compile assembly:single -DskipTests
 
 install:
-	mvn install -DskipTests
+	mvn install -DskipTests -Dgpg.skip=true
 
