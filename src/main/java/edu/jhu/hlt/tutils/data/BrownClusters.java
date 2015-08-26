@@ -75,27 +75,37 @@ public class BrownClusters {
     }
   }
 
-  public static final File bcHomeLaptop = new File("/home/travis/code/fnparse/data/embeddings");
-  public static final File bcHomeGrid = new File("/home/hltcoe/twolfe/fnparse/data/embeddings");
+//  public static final File bcHomeLaptop = new File("/home/travis/code/fnparse/data/embeddings");
+//  public static final File bcHomeGrid = new File("/home/hltcoe/twolfe/fnparse/data/embeddings");
 
   public static File bc256dirAuto() {
-    File f = bc256dir(null);
-    if (f.isDirectory()) return f;
-    f = bc256dir(bcHomeGrid);
-    if (f.isDirectory()) return f;
-    f = bc256dir(bcHomeLaptop);
-    if (f.isDirectory()) return f;
-    throw new RuntimeException("couldn't find it");
+    String home = System.getProperty("data.embeddings");
+    if (home != null)
+      return bc256dir(new File(home));
+    throw new RuntimeException("please provide property: data.embeddings");
+//    File f = bc256dir(null);
+//    if (f.isDirectory()) return f;
+//    f = bc256dir(bcHomeGrid);
+//    if (f.isDirectory()) return f;
+//    f = bc256dir(bcHomeLaptop);
+//    if (f.isDirectory()) return f;
+//    throw new RuntimeException("couldn't needed data in either "
+//        + bcHomeGrid.getPath()
+//        + " or " + bcHomeLaptop.getPath());
   }
 
   public static File bc1000dirAuto() {
-    File f = bc1000dir(null);
-    if (f.isDirectory()) return f;
-    f = bc1000dir(bcHomeGrid);
-    if (f.isDirectory()) return f;
-    f = bc1000dir(bcHomeLaptop);
-    if (f.isDirectory()) return f;
-    throw new RuntimeException("couldn't find it");
+    String home = System.getProperty("data.embeddings");
+    if (home != null)
+      return bc1000dir(new File(home));
+    throw new RuntimeException("please provide property: data.embeddings");
+//    File f = bc1000dir(null);
+//    if (f.isDirectory()) return f;
+//    f = bc1000dir(bcHomeGrid);
+//    if (f.isDirectory()) return f;
+//    f = bc1000dir(bcHomeLaptop);
+//    if (f.isDirectory()) return f;
+//    throw new RuntimeException("couldn't find it");
   }
 
   /** If bcHome is null, will return a relative path */

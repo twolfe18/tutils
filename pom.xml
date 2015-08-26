@@ -30,7 +30,6 @@
     <connection>scm:git:https://gitlab.hltcoe.jhu.edu/twolfe/tutils.git</connection>
     <url>scm:git:https://gitlab.hltcoe.jhu.edu/twolfe/tutils.git</url>
     <developerConnection>scm:git:https://gitlab.hltcoe.jhu.edu/twolfe/tutils.git</developerConnection>
-    <tag>tutils-1.0.0</tag>
   </scm>
 
   <dependencies>

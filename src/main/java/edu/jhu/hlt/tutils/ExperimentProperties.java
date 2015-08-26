@@ -6,10 +6,42 @@ import java.io.File;
  * Methods with defaults will return the default if the key is not in this map,
  * and also add the (key, defaultValue) pair to this map.
  *
+ * Prefer the singleton usage of this class over this over System.getProperties.
+ *
  * @author travis
  */
 public class ExperimentProperties extends java.util.Properties {
   private static final long serialVersionUID = 1L;
+
+  private static ExperimentProperties SINGLETON = null;
+
+  public static ExperimentProperties getInstance() {
+    if (SINGLETON == null)
+      throw new IllegalStateException("you must call init(String[]) first (with the main args)");
+    return SINGLETON;
+  }
+
+  /**
+   * This should be the first call of your program!
+   *
+   * Takes arguments from main like [..., "--key", "value", ...]
+   *
+   * Also takes properties from system properties (ones passed in with -Dkey=value).
+   */
+  public static ExperimentProperties init(String[] mainArgs) {
+    if (mainArgs.length % 2 != 0)
+      throw new IllegalArgumentException("args must have matching key-value pairs (length % 2 == 0)");
+    if (SINGLETON != null)
+      throw new IllegalStateException("you called init more than once!");
+    SINGLETON = new ExperimentProperties();
+    SINGLETON.putAll(System.getProperties());
+    int n1 = SINGLETON.size();
+    SINGLETON.putAll(mainArgs);
+    int n2 = SINGLETON.size();
+    if (n2 != n1 + mainArgs.length / 2)
+      throw new RuntimeException("duplicate keys, TODO implement code to show dups");
+    return SINGLETON;
+  }
 
   public void putAll(String[] mainArgs) {
     putAll(mainArgs, false);
