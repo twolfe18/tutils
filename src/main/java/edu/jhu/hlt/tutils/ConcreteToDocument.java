@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.function.IntConsumer;
 import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 
 import edu.jhu.hlt.concrete.AnnotationMetadata;
 import edu.jhu.hlt.concrete.Communication;
@@ -97,6 +98,9 @@ public class ConcreteToDocument {
 
   public boolean debug = false;
   public boolean debug_cons = false;
+  public boolean debug_propbank = false;
+  public boolean log_cons_id_conversion = true;   // issue related to concrete Constituent id vs index
+  public boolean log_no_entities = true;
 
   /** Only supports a single POS {@link TokenTagging} for now */
   public Predicate<TokenTagging> posToolGold;
@@ -172,6 +176,7 @@ public class ConcreteToDocument {
     corefMentionToolAuto = null;
   }
 
+  /** Warning: This is an ad-hoc utility method, don't rely on this unless you're Travis */
   public void readConll() {
     corefToolGold = "conll-2011 coref";
     cparseToolGold = "conll-2011 parse";
@@ -179,6 +184,14 @@ public class ConcreteToDocument {
     nerToolGold = tt -> "conll-2011 ner".equalsIgnoreCase(tt.getMetadata().getTool());
   }
 
+  /** Warning: This is an ad-hoc utility method, don't rely on this unless you're Travis */
+  public void readPropbank() {
+    readConll();
+    propbankToolGold = "conll-2011 SRL";
+    corefToolGold = null;
+  }
+
+  /** Warning: This is an ad-hoc utility method, don't rely on this unless you're Travis */
   public void readConcreteStanford() {
     corefToolAuto = "Stanford Coref";
     cparseToolAuto = "Stanford CoreNLP";
@@ -353,7 +366,7 @@ public class ConcreteToDocument {
    * also a linked list representing a {@link EntitySet}) added or Document.NONE
    * if the coref/entity set is empty.
    */
-  public static int addCorefConstituents(
+  public int addCorefConstituents(
       List<Entity> entities,
       String toolName,
       EntityMentionSet mentions,
@@ -361,7 +374,8 @@ public class ConcreteToDocument {
       ConcreteDocumentMapping mapping) {
 
     if (entities.isEmpty()) {
-      Log.warn("No entities in \"" + toolName + "\"");
+      if (log_no_entities)
+        Log.warn("No entities in \"" + toolName + "\"");
       return Document.NONE;
     }
 
@@ -453,7 +467,8 @@ public class ConcreteToDocument {
     // Sanity check: Constituents shouldn't really have ids, they should work
     // only on indices.
     if (REWRITE_CONSTITUENT_IDS_TO_INDICES) {
-      Log.info("re-writing constituent ids as indices");
+      if (log_cons_id_conversion)
+        Log.info("re-writing constituent ids as indices");
       rewriteConstituentIdsToMatchIndex(p);
     } else {
       for (int i = 0; i < p.getConstituentListSize(); i++)
@@ -583,7 +598,12 @@ public class ConcreteToDocument {
     return root;
   }
 
-  public Constituent addPropbankSrl(
+  /**
+   * @return the first Constituent which is a linked list of {@link SituationMention}s
+   * or Document.NONE if there are predicates in the SRL labels
+   * or Document.UNINITIALIZED if the {@link SituationMentionSet} cannot be found by the given tool name.
+   */
+  public int addPropbankSrl(
       Communication c,
       String situationMentionSetToolName,
       Map<ConstituentRef, Integer> constituentIndices,  // TODO fold into mapping
@@ -592,13 +612,22 @@ public class ConcreteToDocument {
 
     Document doc = mapping.getDocument();
 
-    Constituent first = null;
-    SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), situationMentionSetToolName);
-    if (sms == null) {
-      System.err.println("failed to find SituationMentionSet by tool: " + situationMentionSetToolName);
-      return null;
+    if (debug_propbank) {
+      Log.info("adding propbank for " + doc.getId() + " sms="
+        + c.getSituationMentionSetList().stream().map(SituationMentionSet::getMetadata).collect(Collectors.toList()));
     }
 
+    SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), situationMentionSetToolName);
+    if (sms == null) {
+      System.err.println("failed to find SituationMentionSet by tool: " + situationMentionSetToolName
+        + " among: " + c.getSituationMentionSetList().stream().map(SituationMentionSet::getMetadata).collect(Collectors.toList()));
+      return Document.UNINITIALIZED;
+    }
+
+    if (debug_propbank)
+      Log.info("numSituations=" + sms.getMentionListSize());
+
+    int first = Document.NONE;
     int prevSit = Document.NONE;
     for (SituationMention sm : sms.getMentionList()) {
 
@@ -610,6 +639,10 @@ public class ConcreteToDocument {
       sit.setParent(Document.NONE);
       if (prevSit != Document.NONE)
         doc.getConstituent(prevSit).setRightSib(sit.getIndex());
+      if (first == Document.NONE) {
+        first = sit.getIndex();
+        assert first >= 0;
+      }
       prevSit = sit.getIndex();
 
       // Set the predicate
@@ -625,10 +658,8 @@ public class ConcreteToDocument {
 
       // Set sit -> pred
       sit.setOnlyChild(pred.getIndex());
-      if (debug)
+      if (debug_propbank) {
         Log.info("adding Situation text=\"" + sm.getText());
-
-      if (debug) {
         Log.info("pred.firstToken=" + pred.getFirstToken()
             + " pred.lastToken=" + pred.getLastToken());
       }
@@ -662,7 +693,7 @@ public class ConcreteToDocument {
         if (argc.getLastToken() > lastT)
           lastT = argc.getLastToken();
 
-        if (debug) {
+        if (debug_propbank) {
           Log.info("setting arg, role=" + arg.getRole()
               + " first=" + argc.getFirstToken()
               + " last=" + argc.getLastToken()
@@ -680,7 +711,7 @@ public class ConcreteToDocument {
       sit.setFirstToken(firstT);
       sit.setLastToken(lastT);
 
-      if (debug) {
+      if (debug_propbank) {
         Log.info("sit.firstToken=" + sit.getFirstToken()
             + " sit.lastToken=" + sit.getLastToken()
             + " numArgs=" + numArgs);
@@ -894,22 +925,18 @@ public class ConcreteToDocument {
 
     // Add Propbank SRL
     if (propbankToolGold != null) {
-      if (debug)
+      if (debug_propbank)
         Log.info("adding propbankToolGold=" + propbankToolGold);
-      Constituent propbankSrl = addPropbankSrl(c, propbankToolGold, constituentIndices, mapping, alph);
-      if (propbankSrl == null)
-        throw new RuntimeException();
-      else
-        doc.cons_propbank_gold = propbankSrl.getIndex();
+      doc.cons_propbank_gold = addPropbankSrl(c, propbankToolGold, constituentIndices, mapping, alph);
+      if (doc.cons_propbank_gold == Document.UNINITIALIZED)
+        throw new RuntimeException("couldn't find gold propbank: " + propbankToolGold);
     }
     if (propbankToolAuto != null) {
-      if (debug)
+      if (debug_propbank)
         Log.info("adding propbankToolAuto=" + propbankToolAuto);
-      Constituent propbankSrl = addPropbankSrl(c, propbankToolAuto, constituentIndices, mapping, alph);
-      if (propbankSrl == null)
-        throw new RuntimeException();
-      else
-        doc.cons_propbank_auto = propbankSrl.getIndex();
+      doc.cons_propbank_auto = addPropbankSrl(c, propbankToolAuto, constituentIndices, mapping, alph);
+      if (doc.cons_propbank_auto == Document.UNINITIALIZED)
+        throw new RuntimeException("couldn't find auto propbank: " + propbankToolAuto);
     }
 
     // Add coref
