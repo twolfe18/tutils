@@ -30,6 +30,8 @@ public class RedisMap<V> {
   private Function<V, byte[]> serialize;
   private Function<byte[], V> deserialize;
 
+  public boolean debug = false;
+
   /**
    * @param prefix may be null, or may be used to distinguish entries from
    * multiple RedisMaps in the same redis DB.
@@ -60,17 +62,20 @@ public class RedisMap<V> {
   }
 
   public void close() {
+    if (debug) System.out.println("[RedisMap] close");
     if (redis != null)
       redis.close();
   }
 
   private byte[] getKey(String key) {
     if (prefix != null)
-      key = prefix + "." + key;
+      key = prefix + key;
+    if (debug) System.out.println("[RedisMap] key=" + key);
     return key.getBytes(StandardCharsets.UTF_8);
   }
 
   public void put(String key, V value) {
+    if (debug) System.out.println("[RedisMap put] key=" + key + " value=" + value);
     byte[] k = getKey(key);
     byte[] v = serialize.apply(value);
     Jedis conn = getConnection();
@@ -78,6 +83,7 @@ public class RedisMap<V> {
   }
 
   public void forcePut(String key, V value) {
+    if (debug) System.out.println("[RedisMap forcePut] key=" + key + " value=" + value);
     byte[] k = getKey(key);
     byte[] v = serialize.apply(value);
     Jedis conn = getConnection();
@@ -85,9 +91,12 @@ public class RedisMap<V> {
   }
 
   public V get(String key) {
+    if (debug) System.out.println("[RedisMap get] key=" + key);
     byte[] k = getKey(key);
     Jedis conn = getConnection();
     byte[] v = conn.get(k);
+    if (v == null)
+      return null;
     V value = deserialize.apply(v);
     return value;
   }
