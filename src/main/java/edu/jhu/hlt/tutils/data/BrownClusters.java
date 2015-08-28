@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import edu.jhu.hlt.tutils.Document;
+import edu.jhu.hlt.tutils.ExperimentProperties;
 import edu.jhu.hlt.tutils.MultiAlphabet;
 import edu.jhu.hlt.tutils.Document.Token;
 
@@ -75,42 +76,18 @@ public class BrownClusters {
     }
   }
 
-//  public static final File bcHomeLaptop = new File("/home/travis/code/fnparse/data/embeddings");
-//  public static final File bcHomeGrid = new File("/home/hltcoe/twolfe/fnparse/data/embeddings");
-
+  /** Uses the key data.embeddings and ExperimentProperties */
   public static File bc256dirAuto() {
-    String home = System.getProperty("data.embeddings");
-    if (home != null)
-      return bc256dir(new File(home));
-    throw new RuntimeException("please provide property: data.embeddings");
-//    File f = bc256dir(null);
-//    if (f.isDirectory()) return f;
-//    f = bc256dir(bcHomeGrid);
-//    if (f.isDirectory()) return f;
-//    f = bc256dir(bcHomeLaptop);
-//    if (f.isDirectory()) return f;
-//    throw new RuntimeException("couldn't needed data in either "
-//        + bcHomeGrid.getPath()
-//        + " or " + bcHomeLaptop.getPath());
+    return bc256dir(ExperimentProperties.getInstance().getExistingDir("data.embeddings"));
   }
 
+  /** Uses the key data.embeddings and ExperimentProperties */
   public static File bc1000dirAuto() {
-    String home = System.getProperty("data.embeddings");
-    if (home != null)
-      return bc1000dir(new File(home));
-    throw new RuntimeException("please provide property: data.embeddings");
-//    File f = bc1000dir(null);
-//    if (f.isDirectory()) return f;
-//    f = bc1000dir(bcHomeGrid);
-//    if (f.isDirectory()) return f;
-//    f = bc1000dir(bcHomeLaptop);
-//    if (f.isDirectory()) return f;
-//    throw new RuntimeException("couldn't find it");
+    return bc1000dir(ExperimentProperties.getInstance().getExistingDir("data.embeddings"));
   }
 
   /** If bcHome is null, will return a relative path */
   public static File bc256dir(File bcHome) {
-    //String f = "data/embeddings/bc_out_256/full.txt_en_256/";
     String f = "bc_out_256/full.txt_en_256/";
     if (bcHome == null)
       return new File(f);  // relative
@@ -118,7 +95,6 @@ public class BrownClusters {
   }
   /** If bcHome is null, will return a relative path */
   public static File bc1000dir(File bcHome) {
-    //String f = "data/embeddings/bc_out_1000/full.txt_en_1000/bc/";
     String f = "bc_out_1000/full.txt_en_1000/bc/";
     if (bcHome == null)
       return new File(f);  // relative
