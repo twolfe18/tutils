@@ -67,12 +67,20 @@ public class ExperimentProperties extends java.util.Properties {
       put(key, String.valueOf(defaultValue));
       return defaultValue;
     }
-    return Integer.parseInt(value);
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException nfe) {
+      throw new RuntimeException(key + " must be an int: " + value);
+    }
   }
 
   public int getInt(String key) {
     String value = getProperty(key);
-    return Integer.parseInt(value);
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException nfe) {
+      throw new RuntimeException(key + " must be an int: " + value);
+    }
   }
 
   public double getDouble(String key, double defaultValue) {
@@ -81,12 +89,20 @@ public class ExperimentProperties extends java.util.Properties {
       put(key, String.valueOf(defaultValue));
       return defaultValue;
     }
-    return Double.parseDouble(value);
+    try {
+      return Double.parseDouble(value);
+    } catch (NumberFormatException nfe) {
+      throw new RuntimeException(key + " must be an double: " + value);
+    }
   }
 
   public double getDouble(String key) {
     String value = getProperty(key);
-    return Double.parseDouble(value);
+    try {
+      return Double.parseDouble(value);
+    } catch (NumberFormatException nfe) {
+      throw new RuntimeException(key + " must be an double: " + value);
+    }
   }
 
   public boolean getBoolean(String key, boolean defaultValue) {
