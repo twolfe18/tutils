@@ -17,7 +17,7 @@ import edu.jhu.hlt.tutils.IntTrip;
 public class DocumentFeatures<T extends Serializable> implements Serializable {
   private static final long serialVersionUID = 8555233879685286282L;
 
-  // TODO could make this a trie
+  // TODO could make this a trie (the keys are IntPairs/IntTrips/tuples of ints)
   // TODO could have smart trie node which tries to be 1) dense, then 2) dense but with shift, then 3) sparse
   private final Map<Object, T> feats;
   private final Document doc;
