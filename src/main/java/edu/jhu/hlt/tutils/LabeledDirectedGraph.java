@@ -61,6 +61,15 @@ public class LabeledDirectedGraph implements Serializable {
   private int[] splitPoints;
 
   /*
+   * TODO This should degrade nicely in the case of a tree.
+   * i.e. tree => {
+   *  splitPoints == null
+   *  edges is in bijection with nodes, that edge is parent -> node, indexed by node
+   *  # i think if the last point is true, the graph algorithms will have to change
+   * }
+   */
+
+  /*
    * TODO split point is undefined in cases where nodes either have no children
    * or no edges at all.
    * 
