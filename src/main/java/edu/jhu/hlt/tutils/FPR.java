@@ -68,8 +68,10 @@ public final class FPR {
   public void accumFN() { accum(0d, 0d, 1d); }
 
   public void accum(FPR fpr) {
-    if(macro != fpr.macro)
-      throw new IllegalArgumentException();
+    if(macro != fpr.macro) {
+      throw new IllegalArgumentException(
+          "two different types of FPR! this=" + macro + " other=" + fpr.macro);
+    }
     pSum += fpr.pSum;
     pZ += fpr.pZ;
     rSum += fpr.rSum;
@@ -85,7 +87,8 @@ public final class FPR {
   /** reflects calls to accum without adjustment for micro/macro */
   public double getFN() { return fn; }
 
-  /** reflects calls to accum without adjustment for micro/macro
+  /**
+   * Reflects calls to accum without adjustment for micro/macro.
    * @param N is the sum of TP + FP + FN + TN, this does the subtraction for you
    */
   public double getTN(double N) {
@@ -114,6 +117,10 @@ public final class FPR {
 
   public double f1() {
     return fMeasure(1d);
+  }
+
+  public boolean isMacroMode() {
+    return macro;
   }
 
   /**
