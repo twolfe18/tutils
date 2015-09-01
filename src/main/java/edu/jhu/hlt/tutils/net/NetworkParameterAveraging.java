@@ -61,7 +61,7 @@ public class NetworkParameterAveraging {
   public static class Server implements Runnable {
     private AvgParams average;
     private int port;
-    public boolean debug = false;
+    public boolean debug = true;
 
     /**
      * You must give a zero parameter vector so that this class doens't have to
@@ -78,14 +78,14 @@ public class NetworkParameterAveraging {
 
     private File checkpointDir;
     private int saveIntervalInSeconds;
-    public void saveModels(File checkpointDir, int saveIntervalInSecons) {
-      Log.info("saving parameters to " + checkpointDir.getPath() + " every " + saveIntervalInSecons + " seconds");
+    public void saveModels(File checkpointDir, int saveIntervalInSeconds) {
+      Log.info("saving parameters to " + checkpointDir.getPath() + " every " + saveIntervalInSeconds + " seconds");
       if (!checkpointDir.isDirectory() || checkpointDir.listFiles().length > 0)
         throw new IllegalArgumentException("must provide an empty directory");
-      if (saveIntervalInSecons < 1)
+      if (saveIntervalInSeconds < 1)
         throw new IllegalArgumentException();
       this.checkpointDir = checkpointDir;
-      this.saveIntervalInSeconds = saveIntervalInSecons;
+      this.saveIntervalInSeconds = saveIntervalInSeconds;
     }
 
     public int getPort() {
@@ -114,37 +114,35 @@ public class NetworkParameterAveraging {
         @SuppressWarnings("resource")
         ServerSocket ss = new ServerSocket(port);
         while (true) {
-          synchronized (average) {
-            Socket client = ss.accept();
+          Socket client = ss.accept();
 
-            if (debug) {
-              Log.info("just accepted connection on server: "
-                  + client.getInetAddress() + ":" + client.getPort());
-            }
-
-            InputStream is = client.getInputStream();
-            OutputStream os = client.getOutputStream();
-
-            // Receive the params, update average
-            average.add(is);
-
-            if (debug)
-              Log.info("received update about to send back average");
-
-            // Send back the average
-            average.getAverage(os);
-            os.flush();
-
-            if (debug)
-              Log.info("done transaction, cleaning up");
-
-            client.close();
-
-
-            // Check if we should save the parameters
-            if (checkpointDir != null && timer.enoughTimePassed(saveIntervalInSeconds))
-              saveModel();
+          if (debug) {
+            Log.info("just accepted connection on server: "
+                + client.getInetAddress() + ":" + client.getPort());
           }
+
+          InputStream is = client.getInputStream();
+          OutputStream os = client.getOutputStream();
+
+          // Receive the params, update average
+          average.add(is);
+
+          if (debug)
+            Log.info("received update about to send back average");
+
+          // Send back the average
+          average.getAverage(os);
+          os.flush();
+
+          if (debug)
+            Log.info("done transaction, cleaning up");
+
+          client.close();
+
+
+          // Check if we should save the parameters
+          if (checkpointDir != null && timer.enoughTimePassed(saveIntervalInSeconds))
+            saveModel();
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
