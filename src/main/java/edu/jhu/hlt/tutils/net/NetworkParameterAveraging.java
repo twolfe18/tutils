@@ -62,6 +62,8 @@ public class NetworkParameterAveraging {
     private AvgParams average;
     private int port;
     public boolean debug = true;
+    public boolean acceptZero = true; // take from client, ignore the zero given at construction
+    private int adds;
 
     /**
      * You must give a zero parameter vector so that this class doens't have to
@@ -74,6 +76,7 @@ public class NetworkParameterAveraging {
     public Server(AvgParams zero, int port) {
       this.average = zero;
       this.port = port;
+      this.adds = 0;
     }
 
     private File checkpointDir;
@@ -118,14 +121,20 @@ public class NetworkParameterAveraging {
 
           if (debug) {
             Log.info("just accepted connection on server: "
-                + client.getInetAddress() + ":" + client.getPort());
+                + client.getInetAddress() + ":" + client.getPort()
+                + " addsBeforeThis=" + adds);
           }
 
           InputStream is = client.getInputStream();
           OutputStream os = client.getOutputStream();
 
           // Receive the params, update average
-          average.add(is);
+          if (adds == 0 && acceptZero) {
+            if (debug) Log.info("setting average because adds=0");
+            average.set(is);
+          } else {
+            average.add(is);
+          }
 
           if (debug)
             Log.info("received update about to send back average");
@@ -138,7 +147,7 @@ public class NetworkParameterAveraging {
             Log.info("done transaction, cleaning up");
 
           client.close();
-
+          adds++;
 
           // Check if we should save the parameters
           if (checkpointDir != null && timer.enoughTimePassed(saveIntervalInSeconds))
