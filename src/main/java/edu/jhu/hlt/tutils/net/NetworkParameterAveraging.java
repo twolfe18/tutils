@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.NotSerializableException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -13,6 +14,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.zip.GZIPOutputStream;
 
+import edu.jhu.hlt.tutils.FileUtil;
 import edu.jhu.hlt.tutils.Log;
 import edu.jhu.hlt.tutils.TimeMarker;
 
@@ -28,6 +30,8 @@ import edu.jhu.hlt.tutils.TimeMarker;
  *
  * TODO Should I scrap this whole thing and use redis?
  * http://redis.io/commands/incrbyfloat
+ *
+ * NOTE: Currently this class does NOT use java serialization.
  *
  * @author travis
  */
@@ -64,6 +68,12 @@ public class NetworkParameterAveraging {
     public boolean debug = true;
     public boolean acceptZero = true; // take from client, ignore the zero given at construction
     private int adds;
+    public SaveMode saveMode = SaveMode.JAVA_SERIALIZATION;
+
+    enum SaveMode {
+      JAVA_SERIALIZATION,
+      GET_AVERAGE,
+    }
 
     /**
      * You must give a zero parameter vector so that this class doens't have to
@@ -182,10 +192,21 @@ public class NetworkParameterAveraging {
       // Save the current one
       File f = new File(checkpointDir,
           "average-" + (System.currentTimeMillis()/1000) + ".jser.gz");
-      try (FileOutputStream fos = new FileOutputStream(f)) {
-        average.getAverage(new GZIPOutputStream(fos));
-      } catch (Exception e) {
-        e.printStackTrace();
+      Log.info("saving average " + average.getClass() + " to " + f.getPath()
+        + " using " + saveMode);
+      switch (saveMode) {
+        case JAVA_SERIALIZATION:
+          FileUtil.serialize(average, f);
+          break;
+        case GET_AVERAGE:
+          try (FileOutputStream fos = new FileOutputStream(f)) {
+            average.getAverage(new GZIPOutputStream(fos));
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+          break;
+        default:
+          throw new RuntimeException();
       }
     }
   }
