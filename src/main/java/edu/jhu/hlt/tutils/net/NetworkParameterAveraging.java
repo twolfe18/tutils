@@ -45,7 +45,7 @@ public class NetworkParameterAveraging {
    * NOTE: Neither of these classes have to be thread-safe for this module,
    * which implements the locking needed for safe usage in isolation.
    */
-  public static interface Params {
+  public interface Params {
     /**
      * Read from data and set internals. If you want to use Java Serialization,
      * then create a Params class which simply wraps your actual params and
@@ -54,8 +54,16 @@ public class NetworkParameterAveraging {
      */
     void set(InputStream data);
     void get(OutputStream data);
+
+    /**
+     * Use this for debugging, Server and Client both call this method when messages are sent and
+     * paramters are saved to disk.
+     */
+    default void receiveMessage(String message) {
+      // no-op by default, override as necessary
+    }
   }
-  public static interface AvgParams extends Params {
+  public interface AvgParams extends Params {
     void add(InputStream other);
     void getAverage(OutputStream data);
   }
@@ -208,6 +216,7 @@ public class NetworkParameterAveraging {
         default:
           throw new RuntimeException();
       }
+      average.receiveMessage("server:savedParams");
     }
   }
 
@@ -283,6 +292,8 @@ public class NetworkParameterAveraging {
           Log.info("done, cleaning up");
 
         s.close();
+
+        params.receiveMessage("client:updatedParams");
       }
     }
   }
