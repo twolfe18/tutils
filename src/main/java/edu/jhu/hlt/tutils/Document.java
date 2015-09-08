@@ -14,6 +14,10 @@ import edu.jhu.hlt.tutils.ling.Language;
  * More or less the CoNLL format in memory, with some other influences which
  * keep things very tabular.
  *
+ * NOTE: These data structures are a bit vague on their own. To get more
+ * documentation, you should consult the code that populates them,
+ * e.g. {@link ConcreteToDocument}.
+ *
  * NOTE: There is a reason that all of the constituency trees are packed into
  * one container. You could imagine having a similar setup (with
  * siblings/parent/children/label/etc) but where each type of tree (e.g.
@@ -95,7 +99,8 @@ public final class Document implements Serializable {
 
 
   /* CONSTITUENT-INDEXED FIELDS ***********************************************/
-  int[] lhs;          // left hand side of a CFG rule, e.g. "NP" or "SBAR", NOT a POS tag (that would mean 1 Constituent per word, we want to stay one level higher than that)
+  // TODO change "lhs" to "label"
+  int[] lhs;          // used for many purposes, see each tree type below for documentation.
   int[] leftChild;    // < 0 for leaf nodes
   int[] rightSib;
   int[] firstToken;   // Document token index, inclusive
@@ -106,11 +111,6 @@ public final class Document implements Serializable {
   int[] rightChild;   // < 0 for leaf nodes
   int[] leftSib;
   int[] depth;
-
-  // TODO Concerning the problem of fitting enough information into `lhs` and
-  // the need for features: I think I'm going to have to add
-  // constituent -> FeatureVector and token -> FeatureVector
-  // mappings.
 
 
   /* LINKED LISTS OF CONSTITUENTS *********************************************/
@@ -180,7 +180,6 @@ public final class Document implements Serializable {
   }
 
   /* GRAPHS *******************************************************************/
-  // TODO Consider optimizing LabeledDirectedGraph to specially handle trees.
 
   // See http://nlp.stanford.edu/software/dependencies_manual.pdf
   public LabeledDirectedGraph stanfordDepsBasic;
