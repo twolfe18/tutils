@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.NotSerializableException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -229,6 +228,7 @@ public class NetworkParameterAveraging {
     private TimeMarker timer;
     public int secondsBetweenContactingServer = 2 * 60;
     public boolean debug = false;
+    private int communications = 0;   // how many times did we talk to the server?
  
     public Client(Params params, String serverHostName) {
       this(params, serverHostName, SERVER_PORT);
@@ -273,7 +273,8 @@ public class NetworkParameterAveraging {
 
     public void averageParameters() throws UnknownHostException, IOException {
       synchronized (params) {
-        Log.info("sending params to: " + serverHostName + ":" + serverPort);
+        Log.info("sending params to: " + serverHostName + ":" + serverPort
+            + " numCommunicationsBeforeThis=" + communications);
         Socket s = new Socket(serverHostName, serverPort);
         InputStream is = s.getInputStream();
         OutputStream os = s.getOutputStream();
@@ -294,6 +295,7 @@ public class NetworkParameterAveraging {
         s.close();
 
         params.receiveMessage("client:updatedParams");
+        communications++;
       }
     }
   }
