@@ -14,6 +14,16 @@ import edu.jhu.hlt.tutils.ling.Language;
  * More or less the CoNLL format in memory, with some other influences which
  * keep things very tabular.
  *
+ * NOTE: There is a reason that all of the constituency trees are packed into
+ * one container. You could imagine having a similar setup (with
+ * siblings/parent/children/label/etc) but where each type of tree (e.g.
+ * cons_ptb_gold and cons_propbank_auto) are stored in separate arrays. This
+ * could even have the additional benefit of being able to free certain columns
+ * on a per-parse basis, thus saving memory. The REASON not to do this is that
+ * by having them all in one (indexing) "universe", i.e. datastructure, they can
+ * reference each other. You can have Situation constituents which have children
+ * which are PTB nodes or Entity nodes, etc.
+ *
  * TODO Dependency parses can be done like constituency parses instead of
  * needing another full array for every type of dependency parse. The cost is
  * that you need another int[] for token (that that label applies to). The
@@ -23,6 +33,22 @@ import edu.jhu.hlt.tutils.ling.Language;
  *
  * TODO figure out a scheme by which we can de-allocate some of these token
  * indexed fields (e.g. checking if all the values are -2, then set to null).
+ *
+ * TODO We can get rid of leftSib/rigthSib by placing constraints on the
+ * ordering used to store Constituents. Namely: siblings can be laid out next to
+ * each othe in the arrays that house them. The rightSibling is always at
+ * index+1 and the left sibling is always at index-1. You can check if you are
+ * the first or last sibling by inspecting the two parents (if they are the same
+ * then they're siblings). Loops over siblings used to read rightSib/leftSib and
+ * possibly jump around in those arrays, now those loops will only use parent
+ * and don't even need to store rightSib/leftSib.
+ * THERE is a DOWNSIDE to this approach: it makes building trees harder. You
+ * have to build in a depth-first fashion. As such, I think it is best to add
+ * this way of storing nodes as an optional data transform. A user would biuld
+ * a tree however they like (likely with rightSib/leftSib) and then call a
+ * "packSiblings" method. This method would need to operate over all Constituent
+ * trees. After it ran, siblings would be adjacent and the rightSib/leftSib
+ * arrays would be freed.
  *
  * TODO Add dependency graphs for collapsed dependency representations.
  * @see edu.jhu.hlt.tutils.LabeledDirectedGraph
