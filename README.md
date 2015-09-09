@@ -21,7 +21,7 @@ array of strings if you've run POS tagging first).
 - when tokenization fails: some languages (e.g. Chinese) have ambiguous boundaries and some have rich morphology
 
 
-#### *tutils reads Concrete*
+#### `tutils` reads Concrete
 [Concrete](https://github.com/hltcoe/concrete) is a data interchange format
 (schema) designed to support easy collaboration and data serialization for NLP
 researchers developed at the [JHU HLTCOE](http://hltcoe.jhu.edu/).  It is based
@@ -109,7 +109,38 @@ Other points (TODO):
 - everything is a tree
 - data structures stay the same, semantics of the data varies
 - structure of arrays: the less data you use the more efficient
-- eliminating the overhead introduced by Java/OOP
+
+#### Eliminating the overhead introduced by Java/OOP
+OOP language that support sub-typing (i.e. most if not all of them) add some
+overhead for each object, and Java even more so due to things like how locking
+is implemented.  For a wrapper around data, this is not really appropriate. You
+don't need extensive polymorphism or abstraction with your data: you just need the
+data. As such, data in `tutils` is primarily stored as primitive arrays.  I
+have includeded convenience classes like `Document.Token` and
+`Document.Constituent` for cases where the conveience is worth the overhead of
+using a class, but you can use `Document` without these, where each method is
+not much more than an array access which can be easily inlined.
+
+#### Structure of arrays (over array of structures)
+This is a common convention in game programming and other high-performance
+computing areas. It is usually more efficient to store `{X[],Y[],Z[]}` than
+`{X,Y,Z}[]`. This has to do with memory bandwidth, data locality, and
+alignment.  The easiest way to see this effect in action is to imagine a very
+fat struct (e.g. `Token`, which needs to include `word`, `posTool1`,
+`posTool2`, `posGold`, `nerTool1`, `lemma`, `brownCluster`, `superSense`,
+`language`, `wordShape`, etc) and use it in a piece of code which only reads
+one of these fields (e.g. `contains(word)` or `matches(simpleNP)` or
+`hist(language)`).  If you have an array of structs, you need to read every
+field into memory even though you are only going to use one of those fields.
+This means more memory bandwidth is required and more cache evictions will take
+place, which will lead to slower code (I will not get into the SIMD/alignment
+argument for structure of arrays because I don't think it is relevant to Java).
+The take-home message is that if you use structures of arrays (SoA), you can
+get speedups according to what fraction of the data members your code uses: the
+less data read the faster the code.  While this may sound like wishful thinking
+and/or premature optimization, even very [simple
+benchmark](https://gist.github.com/twolfe18/8168262c5420c7a62d39) can verify
+that this phenomenon is real and affects JVM programs.
 
 
 
