@@ -11,10 +11,8 @@ public class CLI {
   public static int wcDashL(File f) {
     int lines = 0;
     try (BufferedReader r = new BufferedReader(new FileReader(f))) {
-      while (r.ready()) {
+      for (String line = r.readLine(); line != null; line = r.readLine())
         lines++;
-        r.readLine();
-      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

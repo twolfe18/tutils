@@ -55,11 +55,15 @@ public class FileUtil {
     }
   }
 
-  public static BufferedWriter getWriter(File f) throws IOException {
-    OutputStream is = new FileOutputStream(f);
+  public static BufferedWriter getWriter(File f, boolean append) throws IOException {
+    OutputStream is = new FileOutputStream(f, append);
     if (f.getName().toLowerCase().endsWith(".gz"))
       is = new GZIPOutputStream(is);
     return new BufferedWriter(new OutputStreamWriter(is));
+  }
+
+  public static BufferedWriter getWriter(File f) throws IOException {
+    return getWriter(f, false);
   }
 
   public static BufferedReader getReader(File f) throws IOException {
@@ -73,12 +77,11 @@ public class FileUtil {
     if (VERBOSE)
       Log.info("reading from " + f.getPath());
     Object out = null;
-    try (FileInputStream fis = new FileInputStream(f)) {
-      try (ObjectInputStream oos = f.getName().toLowerCase().endsWith(".gz")
-          ? new ObjectInputStream(new GZIPInputStream(fis))
-          : new ObjectInputStream(fis)) {
-        out = oos.readObject();
-      }
+    try (FileInputStream fis = new FileInputStream(f);
+        ObjectInputStream oos = f.getName().toLowerCase().endsWith(".gz")
+            ? new ObjectInputStream(new GZIPInputStream(fis))
+            : new ObjectInputStream(fis)) {
+      out = oos.readObject();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -88,13 +91,12 @@ public class FileUtil {
   public static void serialize(Object obj, File f) {
     if (VERBOSE)
       Log.info("writing to " + f.getPath());
-    try (FileOutputStream fis = new FileOutputStream(f)) {
-      try (ObjectOutputStream oos = f.getName().toLowerCase().endsWith(".gz")
+    try (FileOutputStream fis = new FileOutputStream(f);
+        ObjectOutputStream oos = f.getName().toLowerCase().endsWith(".gz")
           ? new ObjectOutputStream(new GZIPOutputStream(fis))
           : new ObjectOutputStream(fis)) {
-        oos.writeObject(obj);
-        oos.flush();
-      }
+      oos.writeObject(obj);
+      oos.flush();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

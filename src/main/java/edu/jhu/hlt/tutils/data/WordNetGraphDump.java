@@ -3,7 +3,6 @@ package edu.jhu.hlt.tutils.data;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -12,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import edu.jhu.hlt.tutils.FileUtil;
 import edu.jhu.hlt.tutils.Log;
 import edu.mit.jwi.IRAMDictionary;
 import edu.mit.jwi.RAMDictionary;
@@ -94,9 +94,8 @@ public class WordNetGraphDump {
     if (!f.isFile())
       throw new RuntimeException("f=" + f.getPath());
 
-    try (BufferedReader r = new BufferedReader(new FileReader(f))) {
-      while (r.ready()) {
-        String line = r.readLine();
+    try (BufferedReader r = FileUtil.getReader(f)) {
+      for (String line = r.readLine(); line != null; line = r.readLine()) {
         String[] toks = line.split(" ");
         if (toks.length == 0) continue;
         String word = toks[0];

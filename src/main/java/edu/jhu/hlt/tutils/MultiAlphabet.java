@@ -212,8 +212,8 @@ public class MultiAlphabet implements Serializable {
       try (BufferedReader r = new BufferedReader(new InputStreamReader(is))) {
         Map<String, IntObjectBimap<String>> rep = a.representation();
         Counts<String> read = new Counts<>();
-        while (r.ready()) {
-          String[] toks = r.readLine().split("\t");
+        for (String line = r.readLine(); line != null; line = r.readLine()) {
+          String[] toks = line.split("\t");
           assert toks.length == 3;
           IntObjectBimap<String> m = rep.get(toks[0]);
           read.increment(toks[0]);
@@ -319,8 +319,7 @@ public class MultiAlphabet implements Serializable {
     int c = 0;
     try (BufferedReader r = FileUtil.getReader(table)) {
       try (BufferedWriter w = FileUtil.getWriter(outputTable)) {
-        while (r.ready()) {
-          String line = r.readLine();
+        for (String line = r.readLine(); line != null; line = r.readLine()) {
           String[] fields = line.split(sep);
           // Intify fields
           for (int f : fieldIdx) {

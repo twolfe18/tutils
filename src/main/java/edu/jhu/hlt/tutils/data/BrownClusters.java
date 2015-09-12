@@ -9,6 +9,7 @@ import java.util.Map;
 
 import edu.jhu.hlt.tutils.Document;
 import edu.jhu.hlt.tutils.ExperimentProperties;
+import edu.jhu.hlt.tutils.FileUtil;
 import edu.jhu.hlt.tutils.MultiAlphabet;
 import edu.jhu.hlt.tutils.Document.Token;
 
@@ -29,18 +30,15 @@ public class BrownClusters {
     }
     File pathFile = new File(pathToPercyOutput, "paths");
     word2path = new HashMap<>();
-    try {
-      BufferedReader r = new BufferedReader(
-          new InputStreamReader(new FileInputStream(pathFile)));
-      while (r.ready()) {
-        String[] toks = r.readLine().split("\t");
+    try (BufferedReader r = FileUtil.getReader(pathFile)) {
+      for (String line = r.readLine(); line != null; line = r.readLine()) {
+        String[] toks = line.split("\t");
         String path = toks[0];
         String word = toks[1];
         //int frequency = Integer.parseInt(toks[2]);
         String old = word2path.put(word, path);
         assert old == null;
       }
-      r.close();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

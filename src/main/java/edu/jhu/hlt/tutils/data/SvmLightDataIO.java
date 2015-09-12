@@ -115,10 +115,8 @@ public class SvmLightDataIO {
   public static List<Example> parse(File f, boolean storeComment) throws IOException {
     List<Example> l = new ArrayList<>();
     try (BufferedReader r = FileUtil.getReader(f)) {
-      while (r.ready()) {
-        String line = r.readLine();
+      for (String line = r.readLine(); line != null; line = r.readLine())
         l.add(new Example(line, storeComment));
-      }
     }
     return l;
   }
