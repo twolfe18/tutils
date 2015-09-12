@@ -1,6 +1,9 @@
 package edu.jhu.hlt.tutils;
 
-public class IntTrip {
+import java.io.Serializable;
+
+public class IntTrip implements Serializable {
+  private static final long serialVersionUID = -2733379904840446206L;
 
   public final int first, second, third;
   public final int hash;

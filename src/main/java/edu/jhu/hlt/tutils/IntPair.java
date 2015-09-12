@@ -1,12 +1,14 @@
 package edu.jhu.hlt.tutils;
 
+import java.io.Serializable;
 import java.util.Comparator;
 
 /**
  * Immutable.
  * @author travis
  */
-public class IntPair {
+public class IntPair implements Serializable {
+  private static final long serialVersionUID = -480011813115806273L;
 
   public final int first, second;
   public final int hash;

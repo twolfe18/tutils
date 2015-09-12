@@ -1,5 +1,6 @@
 package edu.jhu.hlt.tutils;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -8,7 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-public class Counts<T> {
+public class Counts<T> implements Serializable {
+  private static final long serialVersionUID = -2960152232810435237L;
+
   private Map<T, Integer> counts = new HashMap<T, Integer>();
   private int total = 0;
 
