@@ -18,6 +18,9 @@ import redis.clients.jedis.Jedis;
  */
 public class RedisMap<V> {
 
+  public static final int NUM_CONNECTION_RETRIES = 50;
+  public static final int CONNECTION_RETRY_DELAY_SECONDS = 10;
+
   // If you want have multiple RedisMaps use a single redis DB, then set this
   // to a unique string for every RedisMap instance.
   private String prefix;
@@ -55,8 +58,28 @@ public class RedisMap<V> {
     if (redis == null) {
       Log.info("connecting host=" + host + " port=" + port
           + " db=" + db + " prefix=" + prefix);
-      redis = new Jedis(host, port);
-      redis.select(db);
+      Exception last = null;
+      for (int i = 0; i < NUM_CONNECTION_RETRIES; i++) {
+        // Connect
+        try {
+          redis = new Jedis(host, port);
+          redis.select(db);
+          break;
+        } catch (Exception e) {
+          Log.warn("Exception while connecting (" + e.getMessage() + "),"
+              + " will try to connect again in " + CONNECTION_RETRY_DELAY_SECONDS
+              + " seconds " + (NUM_CONNECTION_RETRIES - (i+1)) + " more times");
+          last = e;
+        }
+        // Sleep
+        try {
+          Thread.sleep(CONNECTION_RETRY_DELAY_SECONDS * 1000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      if (redis == null)
+        throw new RuntimeException("failed to connect", last);
     }
     return redis;
   }
