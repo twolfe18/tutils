@@ -161,7 +161,7 @@ public class ExperimentProperties extends java.util.Properties {
   public File getExistingFile(String key) {
     File f = getFile(key);
     if (!f.isFile())
-      throw new RuntimeException("ExistingFile property not provided: " + key);
+      throw new RuntimeException("ExistingFile is not file: " + f.getPath());
     return f;
   }
 
