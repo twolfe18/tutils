@@ -8,6 +8,12 @@ import java.io.File;
  *
  * Prefer the singleton usage of this class over this over System.getProperties.
  *
+ * TODO Now that init() is becomming pretty standard in my codebases, I should
+ * add coordination with {@link Log}. Namely, whoever calls init() should have
+ * their class prefix recorded, e.g. "edu.jhu.hlt.fnparse.foo.Bar". After this,
+ * any calls should have their common prefix with the class that called init()
+ * stripped off.
+ *
  * @author travis
  */
 public class ExperimentProperties extends java.util.Properties {
