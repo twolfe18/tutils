@@ -13,11 +13,15 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.channels.FileChannel;
+import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -42,6 +46,34 @@ public class FileUtil {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * @param parent is the directory to search in.
+   * @param glob should be a string like "glob:**\/foo*" (note that there
+   * shouldn't be a backslash, that is just added to make this a legal comment
+   * (it looks like a close block comment otherwise).
+   */
+  public static Iterable<File> find(File parent, String glob) {
+    List<File> output = new ArrayList<>();
+    PathMatcher pm = FileSystems.getDefault().getPathMatcher(glob);
+    try {
+      Files.walkFileTree(parent.toPath(), new SimpleFileVisitor<Path>() {
+        @Override
+        public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
+          if (pm.matches(path))
+            output.add(path.toFile());
+          return FileVisitResult.CONTINUE;
+        }
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+          return FileVisitResult.CONTINUE;
+        }
+      });
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return output;
   }
 
   public static void copy(File sourceFile, File destFile) throws IOException {
