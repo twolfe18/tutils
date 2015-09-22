@@ -175,7 +175,8 @@ public class ExperimentProperties extends java.util.Properties {
     String value = getProperty(key);
     File f;
     if (value == null) {
-      put(key, defaultValue.getPath());
+      if (defaultValue != null)
+        put(key, defaultValue.getPath());
       f = defaultValue;
     } else {
       f = new File(value);
@@ -194,7 +195,8 @@ public class ExperimentProperties extends java.util.Properties {
   public String getString(String key, String defaultValue) {
     String value = getProperty(key);
     if (value == null) {
-      put(key, defaultValue);
+      if (defaultValue != null)
+        put(key, defaultValue);
       return defaultValue;
     }
     return value;
