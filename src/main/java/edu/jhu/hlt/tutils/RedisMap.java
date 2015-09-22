@@ -35,6 +35,15 @@ public class RedisMap<V> {
 
   public boolean debug = false;
 
+  public RedisMap(ExperimentProperties config,
+      Function<V, byte[]> serialize, Function<byte[], V> deserialize) {
+    this(config.getString("redis.prefix", null),
+        config.getString("redis.host"),
+        config.getInt("redis.port"),
+        config.getInt("redis.db", 0),
+        serialize, deserialize);
+  }
+
   /**
    * @param prefix may be null, or may be used to distinguish entries from
    * multiple RedisMaps in the same redis DB.
