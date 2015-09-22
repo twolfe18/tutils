@@ -36,18 +36,28 @@ public class OrderStatistics<T> extends ArrayList<T> {
     return super.add(item);
   }
 
-  /*
+  /**
    * NOTE: This mehtod is not safe and will throw an Exception if T doesn't
    * implement {@link Number}
+   */
   public double getMean() {
+    int n = size();
+    assert n > 0;
+    return getSum() / n;
+  }
+
+  /**
+   * NOTE: This mehtod is not safe and will throw an Exception if T doesn't
+   * implement {@link Number}
+   */
+  public double getSum() {
     double s = 0;
     for (T t : this) {
       Number x = (Number) t;
       s += x.doubleValue();
     }
-    return s / size();
+    return s;
   }
-   */
 
   public List<T> getOrders() {
     return getOrders(DEFAULT_ORDERS, null);
