@@ -24,7 +24,7 @@ public class LazyIteration {
     }
   }
 
-  /** new FIterable(itr, f) is just map(itr, f) */
+  /** new FIterable(itr, f) is just map(f, itr) */
   public static class FIterable<S, T> implements Iterable<T> {
     private final Function<S, T> func;
     private final Iterable<S> base;

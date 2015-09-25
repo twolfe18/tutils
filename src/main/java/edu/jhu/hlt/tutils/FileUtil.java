@@ -21,7 +21,6 @@ import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -54,8 +53,8 @@ public class FileUtil {
    * shouldn't be a backslash, that is just added to make this a legal comment
    * (it looks like a close block comment otherwise).
    */
-  public static Iterable<File> find(File parent, String glob) {
-    List<File> output = new ArrayList<>();
+  public static ArrayList<File> find(File parent, String glob) {
+    ArrayList<File> output = new ArrayList<>();
     PathMatcher pm = FileSystems.getDefault().getPathMatcher(glob);
     try {
       Files.walkFileTree(parent.toPath(), new SimpleFileVisitor<Path>() {
