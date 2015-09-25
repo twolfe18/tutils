@@ -6,7 +6,29 @@ import java.util.function.ToIntFunction;
 
 public class ShardUtils {
 
+  /** Returns (shard, numShards) */
+  public static IntPair getShard(ExperimentProperties config) {
+    String sKey = "shard";
+    String nsKey = "numShards";
+    if (config.containsKey(sKey) != config.containsKey(nsKey)) {
+      throw new RuntimeException("the \"" + sKey + "\" and \"" + nsKey + "\""
+          + " options must be either both used or neither used");
+    }
+    int s, ns;
+    if (config.containsKey(nsKey)) {
+      s = config.getInt(sKey);
+      ns = config.getInt(nsKey);
+    } else {
+      s = 0;
+      ns = 1;
+    }
+    return new IntPair(s, ns);
+  }
+
   /** Eager */
+  public static <T> ArrayList<T> shard(Iterable<T> all, ToIntFunction<T> hash, IntPair shard) {
+    return shard(all, hash, shard.first, shard.second);
+  }
   public static <T> ArrayList<T> shard(Iterable<T> all, ToIntFunction<T> hash, int shard, int numShards) {
     ArrayList<T> rel = new ArrayList<>();
     for (T t : all)
@@ -16,6 +38,9 @@ public class ShardUtils {
   }
 
   /** Lazy */
+  public static <T> Iterator<T> shard(Iterator<T> all, ToIntFunction<T> hash, IntPair shard) {
+    return shard(all, hash, shard.second, shard.second);
+  }
   public static <T> Iterator<T> shard(Iterator<T> all, ToIntFunction<T> hash, int shard, int numShards) {
     Iterator<T> itr = new Iterator<T>() {
       private T next;
