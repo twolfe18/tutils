@@ -7,9 +7,14 @@ package edu.jhu.hlt.tutils;
  * @author travis
  */
 public class TimeMarker {
-  private long lastMark = -1;
-  private long firstMark = -1;
-  private int numMarks = 0;
+  private long lastMark;
+  private long firstMark;
+  private int numMarks;
+
+  public TimeMarker() {
+    lastMark = firstMark = System.currentTimeMillis();
+    numMarks = 0;
+  }
 
   /**
    * @return true if enoughSeconds have passed since this this method last
@@ -18,12 +23,6 @@ public class TimeMarker {
   public boolean enoughTimePassed(double enoughSeconds) {
     long time = System.currentTimeMillis();
     numMarks++;
-    if (firstMark < 0)
-      firstMark = time;
-    if (lastMark < 0) {
-      lastMark = time;
-      return true;
-    }
     double elapsed = (time - lastMark) / 1000d;
     if (elapsed >= enoughSeconds) {
       lastMark = time;
@@ -34,12 +33,10 @@ public class TimeMarker {
   }
 
   public double secondsSinceLastMark() {
-    assert lastMark > 0;
     return (System.currentTimeMillis() - lastMark) / 1000d;
   }
 
   public double secondsSinceFirstMark() {
-    assert firstMark > 0;
     return (System.currentTimeMillis() - firstMark) / 1000d;
   }
 
