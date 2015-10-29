@@ -6,7 +6,11 @@ import java.util.function.ToIntFunction;
 
 public class ShardUtils {
 
-  /** Returns (shard, numShards) */
+  /**
+   * @return (shard, numShards)
+   * If "shard" and "numShards" properties are not given, then returns
+   * (shard=0, numShards=1), which is equivalent to not having any shards.
+   */
   public static IntPair getShard(ExperimentProperties config) {
     String sKey = "shard";
     String nsKey = "numShards";
@@ -31,9 +35,12 @@ public class ShardUtils {
   }
   public static <T> ArrayList<T> shard(Iterable<T> all, ToIntFunction<T> hash, int shard, int numShards) {
     ArrayList<T> rel = new ArrayList<>();
-    for (T t : all)
+    for (T t : all) {
+      if (t == null)
+        throw new IllegalArgumentException("may not have null items to hash");
       if (Math.floorMod(hash.applyAsInt(t), numShards) == shard)
         rel.add(t);
+    }
     return rel;
   }
 

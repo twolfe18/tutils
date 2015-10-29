@@ -104,6 +104,14 @@ public class FileUtil {
     return new BufferedReader(new InputStreamReader(is));
   }
 
+  public static BufferedReader getReaderOrBlowup(File f) {
+    try {
+      return getReader(f);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public static Object deserialize(File f) {
     if (VERBOSE)
       Log.info("reading from " + f.getPath());

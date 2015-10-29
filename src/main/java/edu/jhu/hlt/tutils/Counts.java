@@ -12,7 +12,76 @@ import java.util.Map.Entry;
 public class Counts<T> implements Serializable {
   private static final long serialVersionUID = -2960152232810435237L;
 
-  private Map<T, Integer> counts = new HashMap<T, Integer>();
+  /** Use this if T=int */
+  public static class Int {
+    private int[] counts;
+    private long sum;
+    public Int(int dimension) {
+      counts = new int[dimension];
+      sum = 0;
+    }
+    public int get(int index) {
+      return counts[index];
+    }
+    public double getProb(int index) {
+      assert sum > 0;
+      return ((double) counts[index]) / sum;
+    }
+    public double getLogProb(int index) {
+      return Math.log(counts[index]) - Math.log(sum);
+    }
+    public int increment(int index) {
+      return update(index, 1);
+    }
+    public int decrement(int index) {
+      return update(index, -1);
+    }
+    public int update(int index, int delta) {
+      int old = counts[index];
+      sum += delta;
+      counts[index] += delta;
+      return old;
+    }
+  }
+
+  public static class Pseudo<R> {
+    private Map<R, Double> counts = new HashMap<>();
+    private double total = 0;
+
+    public double getCount(R r) {
+      Double c = counts.get(r);
+      if (c == null)
+        return 0;
+      return c;
+    }
+
+    public double update(R r, double delta) {
+      Double old = counts.get(r);
+      if (old == null)
+        old = 0d;
+      counts.put(r, old + delta);
+      total += delta;
+      return old;
+    }
+
+    public double increment(R r) {
+      return update(r, 1d);
+    }
+
+    public double getTotalCount() {
+      return total;
+    }
+
+    public Iterable<Entry<R, Double>> entrySet() {
+      return counts.entrySet();
+    }
+
+    public int numNonZero() {
+      return counts.size();
+    }
+  }
+
+  private Map<T, Integer> counts = new HashMap<>();
   private int total = 0;
 
   public int getCount(T t) {
@@ -30,10 +99,12 @@ public class Counts<T> implements Serializable {
     return counts.entrySet();
   }
 
+  /** Returns the count before the update */
   public int increment(T t) {
     return update(t, 1);
   }
 
+  /** Returns the count before the update */
   public int update(T t, int delta) {
     int c = getCount(t);
     if (c < 0)
