@@ -108,8 +108,9 @@ public interface Beam<T> extends Iterable<T> {
   public static <T> Beam<T> getMostEfficientImpl(int beamSize) {
     if (beamSize == 1)
       return new Beam1<>();
-    if (beamSize == 4)
-      return new Beam4<>();
+    // I think there is a bug in beam4! Do not use!
+//    if (beamSize == 4)
+//      return new Beam4<>();
     return new BeamN<>(beamSize);
   }
 
