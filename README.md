@@ -104,11 +104,15 @@ describe the downsides of doing this in an OOP way to highlight some pitfalls.
 - When you have multiple theories, you double the depth of the tree and the number of indirections.
 
 
-
 Other points (TODO):
 - everything is a tree
 - data structures stay the same, semantics of the data varies
-- structure of arrays: the less data you use the more efficient
+
+
+#### Everything is a tree
+foo
+
+
 
 #### Eliminating the overhead introduced by Java/OOP
 OOP language that support sub-typing (i.e. most if not all of them) add some

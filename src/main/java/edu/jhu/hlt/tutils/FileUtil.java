@@ -86,22 +86,30 @@ public class FileUtil {
     }
   }
 
-  public static BufferedWriter getWriter(File f, boolean append) throws IOException {
+  public static OutputStream getOutputStream(File f, boolean append) throws IOException {
     OutputStream is = new FileOutputStream(f, append);
     if (f.getName().toLowerCase().endsWith(".gz"))
       is = new GZIPOutputStream(is);
-    return new BufferedWriter(new OutputStreamWriter(is));
+    return is;
+  }
+
+  public static BufferedWriter getWriter(File f, boolean append) throws IOException {
+    return new BufferedWriter(new OutputStreamWriter(getOutputStream(f, append)));
   }
 
   public static BufferedWriter getWriter(File f) throws IOException {
     return getWriter(f, false);
   }
 
-  public static BufferedReader getReader(File f) throws IOException {
+  public static InputStream getInputStream(File f) throws IOException {
     InputStream is = new FileInputStream(f);
     if (f.getName().toLowerCase().endsWith(".gz"))
       is = new GZIPInputStream(is);
-    return new BufferedReader(new InputStreamReader(is));
+    return is;
+  }
+
+  public static BufferedReader getReader(File f) throws IOException {
+    return new BufferedReader(new InputStreamReader(getInputStream(f)));
   }
 
   public static BufferedReader getReaderOrBlowup(File f) {
