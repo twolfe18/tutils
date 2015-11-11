@@ -24,6 +24,9 @@ import java.util.ArrayList;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
+
 public class FileUtil {
   public static boolean VERBOSE = false;
 
@@ -86,10 +89,16 @@ public class FileUtil {
     }
   }
 
+  public static OutputStream getOutputStream(File f) throws IOException {
+    boolean append = false;
+    return getOutputStream(f, append);
+  }
   public static OutputStream getOutputStream(File f, boolean append) throws IOException {
     OutputStream is = new FileOutputStream(f, append);
     if (f.getName().toLowerCase().endsWith(".gz"))
       is = new GZIPOutputStream(is);
+    else if (f.getName().toLowerCase().endsWith(".bz2"))
+      is = new BZip2CompressorOutputStream(is, 9);
     return is;
   }
 
@@ -105,6 +114,8 @@ public class FileUtil {
     InputStream is = new FileInputStream(f);
     if (f.getName().toLowerCase().endsWith(".gz"))
       is = new GZIPInputStream(is);
+    else if (f.getName().toLowerCase().endsWith(".bz2"))
+      is = new BZip2CompressorInputStream(is);
     return is;
   }
 
@@ -147,5 +158,39 @@ public class FileUtil {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static void main(String[] args) throws IOException {
+    if (args.length != 3) {
+      System.err.println("please provide:");
+      System.err.println("1) an input file");
+      System.err.println("2) an output compressed file");
+      System.err.println("3) an output uncompressed/round-trip file");
+      return;
+    }
+    File i1 = new File(args[0]);
+    File o1 = new File(args[1]);
+    File o2 = new File(args[2]);
+    Log.info("compressing: " + i1.getPath() + " => " + o1.getPath());
+    try (BufferedReader r = FileUtil.getReader(i1);
+        BufferedWriter w = FileUtil.getWriter(o1)) {
+      for (String line = r.readLine(); line != null; line = r.readLine())
+        w.write(line + "\n");
+    }
+    // Slower by about 28:16
+//    try (InputStream r = FileUtil.getInputStream(i1);
+//        OutputStream w = FileUtil.getOutputStream(o1)) {
+//      int i;
+//      while ((i = r.read()) >= 0)
+//        w.write(i);
+//    }
+
+    Log.info("decompressing: " + o1.getPath() + " => " + o2.getPath());
+    try (BufferedReader r = FileUtil.getReader(o1);
+        BufferedWriter w = FileUtil.getWriter(o2)) {
+      for (String line = r.readLine(); line != null; line = r.readLine())
+        w.write(line + "\n");
+    }
+    Log.info("done");
   }
 }
