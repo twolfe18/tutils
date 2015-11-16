@@ -120,6 +120,7 @@ public interface Beam<T> extends Iterable<T> {
 
   /**
    * An efficient width-4 beam.
+   * TODO Do better testing, I think this may have a bug.
    */
   public static class Beam4<T> implements Beam<T> {
     private Item<T> x1, x2, x3, x4;

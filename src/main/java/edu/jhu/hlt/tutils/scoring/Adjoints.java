@@ -84,6 +84,28 @@ public interface Adjoints {
     }
   }
 
+  public static class Scale implements Adjoints, Serializable {
+    private static final long serialVersionUID = -6450629521248111070L;
+
+    public final Adjoints wrapped;
+    public final double scale;
+
+    public Scale(double scale, Adjoints wrapped) {
+      this.wrapped = wrapped;
+      this.scale = scale;
+    }
+
+    @Override
+    public double forwards() {
+      return scale * wrapped.forwards();
+    }
+
+    @Override
+    public void backwards(double dErr_dForwards) {
+      wrapped.backwards(scale * dErr_dForwards);
+    }
+  }
+
   // TODO max, prod, neg, div, etc
 
   public static class SingleHiddenLayer implements Adjoints {
