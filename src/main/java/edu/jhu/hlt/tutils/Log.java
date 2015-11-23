@@ -11,6 +11,10 @@ public class Log {
 //      info(msg);
 //  }
 
+  public static void debug(Object msg) {
+    info(msg);
+  }
+
   public static void info(Object msg) {
     long t = System.currentTimeMillis() - init;
     if (SHOW_CALLER) {
