@@ -84,6 +84,65 @@ public interface Adjoints {
     }
   }
 
+  /**
+   * Computes forwards() once during the life of an instance. Forwards all
+   * calls to backwards().
+   */
+  public static class Caching implements Adjoints {
+    private final Adjoints wrapped;
+    private double forwards;
+    private boolean computed;
+    public Caching(Adjoints wrapped) {
+      this.wrapped = wrapped;
+      this.computed = false;
+    }
+    @Override
+    public double forwards() {
+      if (!computed) {
+        forwards = wrapped.forwards();
+        computed = true;
+      }
+      return forwards;
+    }
+    @Override
+    public void backwards(double dErr_dForwards) {
+      wrapped.backwards(dErr_dForwards);
+    }
+    @Override
+    public String toString() {
+      return "(Caching " + wrapped + ")";
+    }
+  }
+
+  /**
+   * a.k.a. HideStructure. Just for debugging, in toString, just show forwards()
+   * for the wrapped adjoints
+   */
+  public static class OnlyShowScore extends Caching {
+    private String name;
+
+    public OnlyShowScore(Adjoints wrapped) {
+      this(null, wrapped);
+    }
+
+    public OnlyShowScore(String name, Adjoints wrapped) {
+      super(wrapped);
+      this.name = name;
+    }
+
+    @Override
+    public String toString() {
+      if (name == null) {
+        return String.format("(OnlyShowScore %.2f)", forwards());
+      } else {
+        return String.format("(%s %.2f)", name, forwards());
+      }
+    }
+  }
+
+  /**
+   * Scales some given adjoints by a constant. Good for sign flips, etc.
+   */
   public static class Scale implements Adjoints, Serializable {
     private static final long serialVersionUID = -6450629521248111070L;
 
@@ -103,6 +162,11 @@ public interface Adjoints {
     @Override
     public void backwards(double dErr_dForwards) {
       wrapped.backwards(scale * dErr_dForwards);
+    }
+
+    @Override
+    public String toString() {
+      return "(Scale " + scale + " * " + wrapped + ")";
     }
   }
 
@@ -170,14 +234,12 @@ public interface Adjoints {
 
   /**
    * Adjoints that are implemented by a dot product between features and parameters.
+   * 
+   * TODO Steal the sparse-dot product code from fnparse...Vector Adjoints.
    */
   public static class Linear implements Adjoints {
     private final IntDoubleVector theta;      // not owned by this class
     private final IntDoubleVector features;
-//    private double cachedDotProd;
-//    private boolean computedCache = false;
-
-//    private final IntDoubleVector gradSumSq;
 
     public Linear(IntDoubleVector theta, IntDoubleVector features) {
       if (theta == null)
@@ -186,31 +248,17 @@ public interface Adjoints {
         throw new IllegalArgumentException("features cannot be null");
       this.theta = theta;
       this.features = features;
-//      this.gradSumSq = new IntDoubleDenseVector();
     }
 
     @Override
     public double forwards() {
-//      if (!computedCache) {
-//        cachedDotProd = theta.dot(features);
-//        computedCache = true;
-//      }
-//      return cachedDotProd;
       return theta.dot(features);
     }
 
     @Override
     public void backwards(double dErr_dForwards) {
       IntDoubleVector update = features.copy();
-
       update.scale(-dErr_dForwards);
-//      double lr = getStepSize();
-//      update.apply((i,v) -> {
-//        double g = -dErr_dForwards * v;
-//        gradSumSq.add(i, g * g);
-//        return lr * g / (1e-9 + Math.sqrt(gradSumSq.get(i)));
-//      });
-
       theta.add(update);
     }
 
