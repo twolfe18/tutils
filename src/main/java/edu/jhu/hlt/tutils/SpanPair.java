@@ -1,5 +1,7 @@
 package edu.jhu.hlt.tutils;
 
+import edu.jhu.hlt.tutils.hash.Hash;
+
 public class SpanPair {
   public final int aStart, aEnd;
   public final int bStart, bEnd;

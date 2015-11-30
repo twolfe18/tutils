@@ -7,6 +7,8 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Random;
 
+import edu.jhu.hlt.tutils.hash.Hash;
+
 public final class Span implements Comparable<Span>, Serializable {
   private static final long serialVersionUID = -7592836078770608357L;
 

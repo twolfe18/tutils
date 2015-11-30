@@ -1,4 +1,4 @@
-package edu.jhu.hlt.tutils;
+package edu.jhu.hlt.tutils.hash;
 
 public class Hash {
 
