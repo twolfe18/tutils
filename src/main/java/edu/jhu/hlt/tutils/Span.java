@@ -198,6 +198,13 @@ Z(4) = 4*3/2 = 6
     return getSpan(Integer.parseInt(toks[0]), Integer.parseInt(toks[1]));
   }
 
+  /** Argument may be null */
+  public static String safeShortString(Span s) {
+    if (s == null)
+      return "null";
+    return s.shortString();
+  }
+
   public String shortString() {
     return start + "-" + end;
   }
