@@ -31,7 +31,7 @@ public interface Adjoints {
   /** Adjoints representing a value which cannot be updated with backwards */
   public static class Constant implements Adjoints, Serializable {
     private static final long serialVersionUID = 6071918010765316387L;
-    private final double value;
+    protected final double value;
     public Constant(double v) {
       this.value = v;
     }
@@ -53,6 +53,19 @@ public interface Adjoints {
     public static final Constant NEGATIVE_ONE = new Constant(-1d);
     public static final Constant NEGATIVE_INFINITY = new Constant(Double.NEGATIVE_INFINITY);
     public static final Constant POSITIVE_INFINITY = new Constant(Double.POSITIVE_INFINITY);
+  }
+
+  public static class NamedConstant extends Constant {
+    private static final long serialVersionUID = 6211238756720056089L;
+    private String name;
+    public NamedConstant(String name, double constant) {
+      super(constant);
+      this.name = name;
+    }
+    @Override
+    public String toString() {
+      return String.format("(%s %.2f)", name, value);
+    }
   }
 
   /** Sum of other Adjoints */
