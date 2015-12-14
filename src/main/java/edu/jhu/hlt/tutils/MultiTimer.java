@@ -7,6 +7,23 @@ public class MultiTimer {
   private Map<String, Timer> timers = new HashMap<String, Timer>();
   private long firstStart = -1;
 
+  public static class ShowPeriodically extends MultiTimer {
+    private TimeMarker marker;
+    private double enoughSeconds;
+    public ShowPeriodically(double everyThisManySeconds) {
+      super();
+      enoughSeconds = everyThisManySeconds;
+      marker = new TimeMarker();
+      marker.enoughTimePassed(enoughSeconds);
+    }
+    @Override
+    public long stop(String key) {
+      if (marker.enoughTimePassed(enoughSeconds))
+        System.out.println(this);
+      return super.stop(key);
+    }
+  }
+
   public Timer get(String key) { return get(key, false); }
   public Timer get(String key, boolean addIfNotPresent) {
     Timer t = timers.get(key);
