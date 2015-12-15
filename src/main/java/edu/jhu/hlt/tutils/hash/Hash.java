@@ -42,4 +42,26 @@ public class Hash {
     h += h << 15;
     return h;
   }
+
+  public static long mix64(long a, long b) {
+    long h = 0;
+    long c;
+    for (int i = 0; i < 64; i += 8) {
+      long mask = 0xFFL << i;
+      // a
+      c = (a & mask) >>> i;
+      h += c;
+      h += h << 10;
+      h ^= h >>> 6;
+      // b
+      c = (b & mask) >>> i;
+      h += c;
+      h += h << 10;
+      h ^= h >>> 6;
+    }
+    h += h << 3;
+    h ^= h >>> 11;
+    h += h << 15;
+    return h;
+  }
 }
