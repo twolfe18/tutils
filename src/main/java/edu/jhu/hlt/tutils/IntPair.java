@@ -3,6 +3,8 @@ package edu.jhu.hlt.tutils;
 import java.io.Serializable;
 import java.util.Comparator;
 
+import edu.jhu.hlt.tutils.hash.Hash;
+
 /**
  * Immutable.
  * @author travis
@@ -16,7 +18,7 @@ public class IntPair implements Serializable {
   public IntPair(int first, int second) {
     this.first = first;
     this.second = second;
-    this.hash = Integer.reverse(first) ^ second;
+    this.hash = Hash.mix(first, second);
   }
 
   @Override

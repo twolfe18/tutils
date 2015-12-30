@@ -2,6 +2,8 @@ package edu.jhu.hlt.tutils;
 
 import java.io.Serializable;
 
+import edu.jhu.hlt.tutils.hash.Hash;
+
 public class IntTrip implements Serializable {
   private static final long serialVersionUID = -2733379904840446206L;
 
@@ -12,7 +14,7 @@ public class IntTrip implements Serializable {
     this.first = first;
     this.second = second;
     this.third = third;
-    this.hash = (second << 20) ^ (first << 10) ^ third;
+    this.hash = Hash.mix(first, second, third);
   }
 
   @Override

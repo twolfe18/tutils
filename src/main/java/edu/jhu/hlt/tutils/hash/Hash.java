@@ -64,4 +64,15 @@ public class Hash {
     h += h << 15;
     return h;
   }
+
+  public static int mix(int... items) {
+    if (items.length == 0)
+      return 0;
+    if (items.length == 1)
+      return items[0];
+    long h = mix64(items[0], items[1]);
+    for (int i = 2; i < items.length; i++)
+      h = mix64(h, items[i]);
+    return (int) (h & 0xFFFFFFFFL);
+  }
 }

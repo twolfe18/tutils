@@ -96,6 +96,9 @@ public interface Adjoints {
       return sb.toString();
     }
   }
+  public static Adjoints sum(Adjoints... summands) {
+    return new Sum(summands);
+  }
 
   /**
    * Computes forwards() once during the life of an instance. Forwards all

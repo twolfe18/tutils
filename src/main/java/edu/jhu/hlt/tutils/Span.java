@@ -71,6 +71,18 @@ Z(4) = 4*3/2 = 6
     return 1 + index(s);
   }
 
+  public static int encodeSpan(Span s, int sentenceLen) {
+    assert s.end <= sentenceLen;
+    assert s.start <= sentenceLen;
+    return s.start + s.end * (sentenceLen + 1);
+  }
+  public static Span decodeSpan(int enc, int sentenceLen) {
+    assert enc >= 0;
+    int start = enc % (sentenceLen + 1);
+    int end = enc / (sentenceLen + 1);
+    return getSpan(start, end);
+  }
+
   public int start;  // inclusive
   public int end;    // non-inclusive
 

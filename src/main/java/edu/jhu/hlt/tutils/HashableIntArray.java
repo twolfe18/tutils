@@ -38,6 +38,14 @@ public class HashableIntArray {
   }
 
   @Override
+  public String toString() {
+    String as = Arrays.toString(array);
+    if (as.length() > 80)
+      as = as.substring(0, 80) + "...";
+    return "(Hashable " + as + ")";
+  }
+
+  @Override
   public int hashCode() {
     return (int) (hash & 0xFFFFFFFF);
   }
