@@ -1,5 +1,8 @@
 package edu.jhu.hlt.tutils.hash;
 
+import java.io.File;
+import java.security.MessageDigest;
+
 public class Hash {
 
   /**
@@ -74,5 +77,31 @@ public class Hash {
     for (int i = 2; i < items.length; i++)
       h = mix64(h, items[i]);
     return (int) (h & 0xFFFFFFFFL);
+  }
+  public static long mix64(long... items) {
+    if (items.length == 0)
+      return 0;
+    if (items.length == 1)
+      return items[0];
+    long h = mix64(items[0], items[1]);
+    for (int i = 2; i < items.length; i++)
+      h = mix64(h, items[i]);
+    return h;
+  }
+
+  /** A slow but decent hash for strings */
+  public static int sha256(String s) {
+    try {
+      MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+      messageDigest.update(s.getBytes());
+      String e = new String(messageDigest.digest());
+      return e.hashCode();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static int fileName(File f) {
+    return sha256(f.getPath());
   }
 }

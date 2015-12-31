@@ -49,6 +49,11 @@ public class ExperimentProperties extends java.util.Properties {
     return SINGLETON;
   }
 
+  /** Use this if you only want to read in properties from java properties and not command line args */
+  public static ExperimentProperties init() {
+    return init(new String[0]);
+  }
+
   public void putAll(String[] mainArgs) {
     putAll(mainArgs, false);
   }
