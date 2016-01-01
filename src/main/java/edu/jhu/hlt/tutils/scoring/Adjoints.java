@@ -130,6 +130,13 @@ public interface Adjoints {
     }
   }
 
+  /** Will wrap the given adjoints in a caching instance of this is not already a caching instance */
+  public static Caching cacheIfNeeded(Adjoints a) {
+    if (a instanceof Caching)
+      return (Caching) a;
+    return new Caching(a);
+  }
+
   /**
    * a.k.a. HideStructure. Just for debugging, in toString, just show forwards()
    * for the wrapped adjoints
