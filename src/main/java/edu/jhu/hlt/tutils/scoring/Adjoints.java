@@ -27,9 +27,12 @@ public interface Adjoints {
    */
   public void backwards(double dErr_dForwards);
 
+  public interface ICaching extends Adjoints {
+    // forwards has its value cached for the life of the instance
+  }
 
   /** Adjoints representing a value which cannot be updated with backwards */
-  public static class Constant implements Adjoints, Serializable {
+  public static class Constant implements Adjoints, Serializable, ICaching {
     private static final long serialVersionUID = 6071918010765316387L;
     protected final double value;
     public Constant(double v) {
@@ -55,7 +58,7 @@ public interface Adjoints {
     public static final Constant POSITIVE_INFINITY = new Constant(Double.POSITIVE_INFINITY);
   }
 
-  public static class NamedConstant extends Constant {
+  public static class NamedConstant extends Constant implements ICaching {
     private static final long serialVersionUID = 6211238756720056089L;
     private String name;
     public NamedConstant(String name, double constant) {
@@ -69,7 +72,7 @@ public interface Adjoints {
   }
 
   /** Sum of other Adjoints */
-  public static class Sum implements Adjoints, Serializable {
+  public static final class Sum implements Adjoints, Serializable {
     private static final long serialVersionUID = -1294541640504248521L;
     private final Adjoints[] items;
     public Sum(Adjoints... items) {
@@ -100,11 +103,66 @@ public interface Adjoints {
     return new Sum(summands);
   }
 
+  public static final class CachingBinarySum implements Adjoints, Serializable, ICaching {
+    private static final long serialVersionUID = 1409636835431295798L;
+    private Adjoints left, right;
+    private double forwards;
+    public CachingBinarySum(Adjoints left, Adjoints right) {
+      this.left = left;
+      this.right = right;
+      this.forwards = left.forwards() + right.forwards();
+    }
+    @Override
+    public double forwards() {
+      return forwards;
+    }
+    @Override
+    public void backwards(double dErr_dForwards) {
+      left.backwards(dErr_dForwards);
+      right.backwards(dErr_dForwards);
+    }
+    @Override
+    public String toString() {
+      return "(CBSum " + left + " + " + right + ")";
+    }
+  }
+  public static final class CachingTernarySum implements Adjoints, Serializable, ICaching {
+    private static final long serialVersionUID = 5628255488165277061L;
+    private Adjoints a, b, c;
+    private double forwards;
+    public CachingTernarySum(Adjoints a, Adjoints b, Adjoints c) {
+      this.a = a;
+      this.b = b;
+      this.c = c;
+      this.forwards = a.forwards() + b.forwards() + c.forwards();
+    }
+    @Override
+    public double forwards() {
+      return forwards;
+    }
+    @Override
+    public void backwards(double dErr_dForwards) {
+      a.backwards(dErr_dForwards);
+      b.backwards(dErr_dForwards);
+      c.backwards(dErr_dForwards);
+    }
+    @Override
+    public String toString() {
+      return "(CTSum " + a + " + " + b + " + " + c + ")";
+    }
+  }
+  public static ICaching cacheSum(Adjoints a, Adjoints b) {
+    return new CachingBinarySum(a, b);
+  }
+  public static ICaching cacheSum(Adjoints a, Adjoints b, Adjoints c) {
+    return new CachingTernarySum(a, b, c);
+  }
+
   /**
    * Computes forwards() once during the life of an instance. Forwards all
    * calls to backwards().
    */
-  public static class Caching implements Adjoints {
+  public static class Caching implements Adjoints, ICaching {
     private final Adjoints wrapped;
     private double forwards;
     private boolean computed;
@@ -131,9 +189,9 @@ public interface Adjoints {
   }
 
   /** Will wrap the given adjoints in a caching instance of this is not already a caching instance */
-  public static Caching cacheIfNeeded(Adjoints a) {
-    if (a instanceof Caching)
-      return (Caching) a;
+  public static ICaching cacheIfNeeded(Adjoints a) {
+    if (a instanceof ICaching)
+      return (ICaching) a;
     return new Caching(a);
   }
 
