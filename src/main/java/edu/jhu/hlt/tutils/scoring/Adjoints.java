@@ -188,6 +188,35 @@ public interface Adjoints {
     }
   }
 
+  public static class Caching2<T extends Adjoints> implements Adjoints, ICaching {
+    private final T wrapped;
+    private double forwards;
+    private boolean computed;
+    public Caching2(T wrapped) {
+      this.wrapped = wrapped;
+      this.computed = false;
+    }
+    public T getWrapped() {
+      return wrapped;
+    }
+    @Override
+    public double forwards() {
+      if (!computed) {
+        forwards = wrapped.forwards();
+        computed = true;
+      }
+      return forwards;
+    }
+    @Override
+    public void backwards(double dErr_dForwards) {
+      wrapped.backwards(dErr_dForwards);
+    }
+    @Override
+    public String toString() {
+      return "(Caching2 " + wrapped + ")";
+    }
+  }
+
   /** Will wrap the given adjoints in a caching instance of this is not already a caching instance */
   public static ICaching cacheIfNeeded(Adjoints a) {
     if (a instanceof ICaching)
@@ -226,28 +255,48 @@ public interface Adjoints {
    */
   public static class Scale implements Adjoints, Serializable {
     private static final long serialVersionUID = -6450629521248111070L;
-
     public final Adjoints wrapped;
     public final double scale;
-
     public Scale(double scale, Adjoints wrapped) {
       this.wrapped = wrapped;
       this.scale = scale;
     }
-
     @Override
     public double forwards() {
       return scale * wrapped.forwards();
     }
-
     @Override
     public void backwards(double dErr_dForwards) {
       wrapped.backwards(scale * dErr_dForwards);
     }
-
     @Override
     public String toString() {
       return "(Scale " + scale + " * " + wrapped + ")";
+    }
+  }
+
+  public static class Scale2<T extends Adjoints> implements Adjoints, Serializable {
+    private static final long serialVersionUID = -8355247071577961779L;
+    public final T wrapped;
+    public final double scale;
+    public Scale2(double scale, T wrapped) {
+      this.wrapped = wrapped;
+      this.scale = scale;
+    }
+    public T getWrapped() {
+      return wrapped;
+    }
+    @Override
+    public double forwards() {
+      return scale * wrapped.forwards();
+    }
+    @Override
+    public void backwards(double dErr_dForwards) {
+      wrapped.backwards(scale * dErr_dForwards);
+    }
+    @Override
+    public String toString() {
+      return "(Scale2 " + scale + " * " + wrapped + ")";
     }
   }
 
