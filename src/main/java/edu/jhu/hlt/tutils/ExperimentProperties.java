@@ -8,6 +8,12 @@ import java.io.File;
  *
  * Prefer the singleton usage of this class over this over System.getProperties.
  *
+ * Booleans have a special feature called "flip". If you provide the value "flip"
+ * to a boolean field on the command line and then getBoolean(key, defaultBool)
+ * is called, that method will return !defaultBool. If you call getBoolean(key),
+ * an exception will be thrown. This is useful for perturbing one boolean at a
+ * time to test if it works better than the default.
+ *
  * TODO Now that init() is becomming pretty standard in my codebases, I should
  * add coordination with {@link Log}. Namely, whoever calls init() should have
  * their class prefix recorded, e.g. "edu.jhu.hlt.fnparse.foo.Bar". After this,
@@ -18,6 +24,9 @@ import java.io.File;
  */
 public class ExperimentProperties extends java.util.Properties {
   private static final long serialVersionUID = 1L;
+
+  public static final String FLIP = "flip";
+  public static boolean LOG_FLIPS = true;
 
   private static ExperimentProperties SINGLETON = null;
 
@@ -121,12 +130,23 @@ public class ExperimentProperties extends java.util.Properties {
     if (value == null) {
       put(key, String.valueOf(defaultValue));
       return defaultValue;
+    } else if (FLIP.equals(value)) {
+      boolean v = !defaultValue;
+      if (LOG_FLIPS)
+        Log.info(key + " was flipped from " + defaultValue + " to " + v);
+      put(key, String.valueOf(v));
+      return v;
     }
     return Boolean.parseBoolean(value);
   }
 
   public boolean getBoolean(String key) {
     String value = getProperty(key);
+    if (FLIP.equals(value)) {
+      throw new RuntimeException("a property/argument set the default value to \""
+          + FLIP + "\" which means that you cannot ask for \"" + key
+          + "\" without providing a default to flip -- use 2 arg method");
+    }
     return Boolean.parseBoolean(value);
   }
 
