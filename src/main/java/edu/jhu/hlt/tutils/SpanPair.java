@@ -12,11 +12,7 @@ public class SpanPair {
     aEnd = a.end;
     bStart = b.start;
     bEnd = b.end;
-    int h = aStart;
-    h = Hash.mix(h, aEnd - aStart);
-    h = Hash.mix(h, bStart);
-    h = Hash.mix(h, bEnd - bStart);
-    hash = h;
+    hash = Hash.mix(aStart, bStart, aEnd, bEnd);
   }
 
   @Override
