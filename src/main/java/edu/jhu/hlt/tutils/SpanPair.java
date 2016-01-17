@@ -1,8 +1,12 @@
 package edu.jhu.hlt.tutils;
 
+import java.io.Serializable;
+
 import edu.jhu.hlt.tutils.hash.Hash;
 
-public class SpanPair {
+public class SpanPair implements Serializable {
+  private static final long serialVersionUID = -5236947178233672871L;
+
   public final int aStart, aEnd;
   public final int bStart, bEnd;
   public final int hash;
