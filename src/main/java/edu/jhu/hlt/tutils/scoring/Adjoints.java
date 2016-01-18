@@ -300,6 +300,31 @@ public interface Adjoints {
     }
   }
 
+  /**
+   * Very useful. lr=-1 means "update towards". lr=0 means "constant".
+   * lr=smallNumber means "parameter that shouldn't change much".
+   */
+  public static class WithLearningRate implements Adjoints, Serializable {
+    private static final long serialVersionUID = -5799448875475501624L;
+    private final Adjoints wrapped;
+    private double learningRate;
+    public WithLearningRate(double lr, Adjoints wrapped) {
+      if (!Double.isFinite(lr))
+        throw new IllegalArgumentException();
+      this.wrapped = wrapped;
+      this.learningRate = lr;
+    }
+    @Override
+    public double forwards() {
+      return wrapped.forwards();
+    }
+
+    @Override
+    public void backwards(double dErr_dForwards) {
+      wrapped.backwards(learningRate * dErr_dForwards);
+    }
+  }
+
   // TODO max, prod, neg, div, etc
 
   public static class SingleHiddenLayer implements Adjoints {
