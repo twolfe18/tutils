@@ -6,12 +6,27 @@ import java.util.function.ToIntFunction;
 
 public class ShardUtils {
 
+  public static class Shard extends IntPair {
+    private static final long serialVersionUID = 8002427683485461635L;
+    public Shard(int shard, int numShards) {
+      super(shard, numShards);
+      if (shard < 0 || shard >= numShards || numShards < 1)
+        throw new IllegalArgumentException("shard=" + shard + " numShards=" + numShards);
+    }
+    public int getShard() {
+      return first;
+    }
+    public int getNumShards() {
+      return second;
+    }
+  }
+
   /**
    * @return (shard, numShards)
    * If "shard" and "numShards" properties are not given, then returns
    * (shard=0, numShards=1), which is equivalent to not having any shards.
    */
-  public static IntPair getShard(ExperimentProperties config) {
+  public static Shard getShard(ExperimentProperties config) {
     String sKey = "shard";
     String nsKey = "numShards";
     if (config.containsKey(sKey) != config.containsKey(nsKey)) {
@@ -26,11 +41,11 @@ public class ShardUtils {
       s = 0;
       ns = 1;
     }
-    return new IntPair(s, ns);
+    return new Shard(s, ns);
   }
 
   /** Eager */
-  public static <T> ArrayList<T> shard(Iterable<T> all, ToIntFunction<T> hash, IntPair shard) {
+  public static <T> ArrayList<T> shard(Iterable<T> all, ToIntFunction<T> hash, Shard shard) {
     return shard(all, hash, shard.first, shard.second);
   }
   public static <T> ArrayList<T> shard(Iterable<T> all, ToIntFunction<T> hash, int shard, int numShards) {
@@ -43,9 +58,24 @@ public class ShardUtils {
     }
     return rel;
   }
+  public static <T> ArrayList<T> shardByIndex(Iterable<T> all, Shard shard) {
+    return shardByIndex(all, shard.getShard(), shard.getNumShards());
+  }
+  public static <T> ArrayList<T> shardByIndex(Iterable<T> all, int shard, int numShards) {
+    ArrayList<T> rel = new ArrayList<>();
+    int i = 0;
+    for (T t : all) {
+      if (t == null)
+        throw new IllegalArgumentException("may not have null items to hash");
+      if (Math.floorMod(i, numShards) == shard)
+        rel.add(t);
+      i++;
+    }
+    return rel;
+  }
 
   /** Lazy */
-  public static <T> Iterator<T> shard(Iterator<T> all, ToIntFunction<T> hash, IntPair shard) {
+  public static <T> Iterator<T> shard(Iterator<T> all, ToIntFunction<T> hash, Shard shard) {
     return shard(all, hash, shard.second, shard.second);
   }
   public static <T> Iterator<T> shard(Iterator<T> all, ToIntFunction<T> hash, int shard, int numShards) {
@@ -73,4 +103,35 @@ public class ShardUtils {
     itr.next();   // initialize next
     return itr;
   }
+  public static <T> Iterator<T> shardByIndex(Iterator<T> all, Shard shard) {
+    return shardByIndex(all, shard.getShard(), shard.getNumShards());
+  }
+  public static <T> Iterator<T> shardByIndex(Iterator<T> all, int shard, int numShards) {
+    Iterator<T> itr = new Iterator<T>() {
+      private int i = 0;
+      private T next;
+      private Iterator<T> itr = all;
+      @Override
+      public boolean hasNext() {
+        return next != null;
+      }
+      @Override
+      public T next() {
+        T t = next;
+        next = null;
+        while (itr.hasNext()) {
+          T n = itr.next();
+          i++;
+          if (Math.floorMod(i, numShards) == shard) {
+            next = n;
+            break;
+          }
+        }
+        return t;
+      }
+    };
+    itr.next();   // initialize next
+    return itr;
+  }
+
 }
