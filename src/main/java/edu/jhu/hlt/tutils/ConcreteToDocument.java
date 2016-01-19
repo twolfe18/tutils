@@ -102,6 +102,9 @@ public class ConcreteToDocument {
   public boolean log_cons_id_conversion = true;   // issue related to concrete Constituent id vs index
   public boolean log_no_entities = true;
 
+  /** See {@link ConcreteDocumentMapping}, if false only keeps a {@link UUID} */
+  public boolean keepConcrete = true;
+
   /** Only supports a single POS {@link TokenTagging} for now */
   public Predicate<TokenTagging> posToolGold;
   public Predicate<TokenTagging> posToolAuto;
@@ -763,7 +766,9 @@ public class ConcreteToDocument {
     Document doc = new Document(c.getId(), docIndex, alph);
     doc.language = language;
     doc.allowExpansion(true);
-    ConcreteDocumentMapping mapping = new ConcreteDocumentMapping(c, doc);
+    ConcreteDocumentMapping mapping = keepConcrete
+        ? new ConcreteDocumentMapping(c, doc)
+        : new ConcreteDocumentMapping(c.getUuid(), doc);
     DocumentTester tester = new DocumentTester(doc, true);
 
     // Count the number of tokens and add the sentence sectioning

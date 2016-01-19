@@ -10,12 +10,14 @@ public class MultiTimer {
   public static class ShowPeriodically extends MultiTimer {
     private TimeMarker marker;
     private double enoughSeconds;
+
     public ShowPeriodically(double everyThisManySeconds) {
       super();
       enoughSeconds = everyThisManySeconds;
       marker = new TimeMarker();
       marker.enoughTimePassed(enoughSeconds);
     }
+
     @Override
     public long stop(String key) {
       if (marker.enoughTimePassed(enoughSeconds))
