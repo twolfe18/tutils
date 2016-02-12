@@ -98,6 +98,7 @@ public class ConcreteToDocument {
 
   public boolean debug = false;
   public boolean debug_cons = false;
+  public boolean debug_deps = false;
   public boolean debug_propbank = false;
   public boolean log_cons_id_conversion = true;   // issue related to concrete Constituent id vs index
   public boolean log_no_entities = true;
@@ -763,6 +764,18 @@ public class ConcreteToDocument {
   public ConcreteDocumentMapping communication2Document(
       Communication c, int docIndex, MultiAlphabet alph, Language language) {
 
+    if (debug) {
+      System.out.println("keepConcrete=" + this.keepConcrete);
+      System.out.println("cparseToolAuto=" + this.cparseToolAuto);
+      System.out.println("cparseToolGold=" + this.cparseToolGold);
+      System.out.println("propbankToolAuto" + this.propbankToolAuto);
+      System.out.println("propbankToolGold" + this.propbankToolGold);
+      System.out.println("corefMentionToolAuto=" + this.corefMentionToolAuto);
+      System.out.println("corefMentionToolGold=" + this.corefMentionToolGold);
+      System.out.println("corefToolAuto=" + this.corefToolAuto);
+      System.out.println("corefToolGold=" + this.corefToolGold);
+    }
+
     Document doc = new Document(c.getId(), docIndex, alph);
     doc.language = language;
     doc.allowExpansion(true);
@@ -818,6 +831,11 @@ public class ConcreteToDocument {
     LabeledDirectedGraph.Builder dparseColl = new LabeledDirectedGraph().new Builder();
     LabeledDirectedGraph.Builder dparseCollCC = new LabeledDirectedGraph().new Builder();
     LabeledDirectedGraph.Builder dparseUD = new LabeledDirectedGraph().new Builder();
+
+    // We use numToks (in the entire document) as the root for all dparses
+    assert numToks > 0;
+    final int dParseRoot = numToks;
+
     for (Section s : c.getSectionList()) {
       for (Sentence ss : s.getSentenceList()) {
         Tokenization tkz = ss.getTokenization();
@@ -897,19 +915,18 @@ public class ConcreteToDocument {
         // Uses numToks (count for the document) as the root index in these
         // dep trees. This is a requirement due to not being able to bit-pack
         // negative numbers (LabeledDirectedGraph limitation).
-        assert numToks > 0;
         dparseBasic.addFromConcrete(
             findByPredicate(tkz.getDependencyParseList(), this.dparseBasicTool),
-            tokenOffset, n, numToks, alph);
+            tokenOffset, n, dParseRoot, alph);
         dparseColl.addFromConcrete(
             findByPredicate(tkz.getDependencyParseList(), this.dparseColTool),
-            tokenOffset, n, numToks, alph);
+            tokenOffset, n, dParseRoot, alph);
         dparseCollCC.addFromConcrete(
             findByPredicate(tkz.getDependencyParseList(), this.dparseColCCTool),
-            tokenOffset, n, numToks, alph);
+            tokenOffset, n, dParseRoot, alph);
         dparseUD.addFromConcrete(
             findByPredicate(tkz.getDependencyParseList(), this.dparseUDTool),
-            tokenOffset, n, numToks, alph);
+            tokenOffset, n, dParseRoot, alph);
 
         tokenOffset += n;
       }

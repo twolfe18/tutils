@@ -123,7 +123,21 @@ public class Counts<T> implements Serializable {
   }
 
   public String toString() {
-    return counts.toString();
+//    return counts.toString();
+    StringBuilder sb = null;
+    for (T t : getKeysSortedByCount(true)) {
+      int c = getCount(t);
+      if (sb == null) {
+        sb = new StringBuilder("{");
+      } else {
+        sb.append(' ');
+      }
+      sb.append(t + ":" + c);
+    }
+    if (sb == null)
+      return "{}";
+    sb.append('}');
+    return sb.toString();
   }
 
   /** Will hit a runtime error if keys is not comparable */

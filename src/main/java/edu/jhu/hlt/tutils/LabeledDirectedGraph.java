@@ -21,6 +21,10 @@ import edu.jhu.hlt.concrete.util.ConcreteException;
 /**
  * Adjacency list style graph representation.
  *
+ * Note: For dependency parses, "node" means the same thing as token. So if you
+ * want to know, e.g. what the parent of token 5 is, you call getNode(5).getParent(0),
+ * which returns a node/token index.
+ *
  * Only allows non-negative node indices for now, so you have to use N as a root
  * index (where there are N valid tokens which are 0-indexed).
  *

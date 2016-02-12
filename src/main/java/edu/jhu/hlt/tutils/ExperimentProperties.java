@@ -1,6 +1,9 @@
 package edu.jhu.hlt.tutils;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Methods with defaults will return the default if the key is not in this map,
@@ -61,6 +64,27 @@ public class ExperimentProperties extends java.util.Properties {
   /** Use this if you only want to read in properties from java properties and not command line args */
   public static ExperimentProperties init() {
     return init(new String[0]);
+  }
+
+  /**
+   * Throws an exception if more than one of the provided keys is present
+   * @param atleastOne will force an exception if none of the given keys is present
+   */
+  public void assertMutuallyExclusive(boolean atleastOne, String... keys) {
+    List<String> present = new ArrayList<>();
+    for (String k : keys) {
+      if (this.containsKey(k))
+        present.add(k);
+    }
+    if (atleastOne && present.isEmpty()) {
+      throw new IllegalStateException(
+          "you need to provide at least one of the following key: "
+              + Arrays.toString(keys));
+    }
+    if (present.size() > 1) {
+      throw new IllegalStateException(
+          "these flags are mutually exclusive: " + present);
+    }
   }
 
   public void putAll(String[] mainArgs) {
