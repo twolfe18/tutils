@@ -33,7 +33,10 @@ public final class Span implements Comparable<Span>, Serializable {
    * Doesn't work for nullSpan, requires start<end.
    */
   public static int index(Span s) {
-    assert s.start < s.end;
+    return index(s.start, s.end);
+  }
+  public static int index(int start, int end) {
+    assert start < end;
     /*
 key = (i,j) where i<j
 M = number of mentions
@@ -61,8 +64,8 @@ index(i=2,j=4) = Z(4) + 2
 Z(4) = 4*3/2 = 6
 => 8, correct!
      */
-    int Z = s.end * (s.end - 1) / 2;
-    return Z + s.start;
+    int Z = end * (end - 1) / 2;
+    return Z + start;
   }
 
   public static int indexMaybeNullSpan(Span s) {
