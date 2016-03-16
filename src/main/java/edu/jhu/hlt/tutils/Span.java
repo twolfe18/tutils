@@ -7,6 +7,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Random;
 
+import edu.jhu.hlt.concrete.TokenRefSequence;
 import edu.jhu.hlt.tutils.hash.Hash;
 
 public final class Span implements Comparable<Span>, Serializable {
@@ -126,6 +127,26 @@ Z(4) = 4*3/2 = 6
     }
     int width = end - start;
     return internedSpans[start][width - 1];
+  }
+
+  /**
+   * Reads a continuous and non-empty Span from tokenIndexList.
+   * @param outputEndIsInclusive says whether the Span returned should have an
+   * inclusive or exclusive ending (start is always inclusive).
+   */
+  public static Span getSpan(TokenRefSequence trs, boolean outputEndIsInclusive) {
+    int start = trs.getTokenIndexList().get(0);
+    int prev = start - 1;
+    int end = start;
+    for (int i : trs.getTokenIndexList()) {
+      assert i >= start : "non-ordered tokens? " + trs.getTokenIndexList();
+      assert i == prev + 1 : "gappy tokens? " + trs.getTokenIndexList();
+      prev = i;
+      end = i;
+    }
+    if (outputEndIsInclusive)
+      return getSpan(start, end);
+    return getSpan(start, end + 1);
   }
 
   private Span(int start, int end) {
