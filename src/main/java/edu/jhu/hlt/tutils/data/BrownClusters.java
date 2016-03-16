@@ -10,6 +10,7 @@ import java.util.Map;
 import edu.jhu.hlt.tutils.Document;
 import edu.jhu.hlt.tutils.ExperimentProperties;
 import edu.jhu.hlt.tutils.FileUtil;
+import edu.jhu.hlt.tutils.Log;
 import edu.jhu.hlt.tutils.MultiAlphabet;
 import edu.jhu.hlt.tutils.Document.Token;
 
@@ -23,6 +24,7 @@ public class BrownClusters {
   private Map<String, String> word2path;
 
   public BrownClusters(File pathToPercyOutput) {
+    Log.info("loading Brown clusters from " + pathToPercyOutput.getPath());
     if (!pathToPercyOutput.isDirectory()) {
       throw new IllegalArgumentException(
           "not a directory: " + pathToPercyOutput.getPath());

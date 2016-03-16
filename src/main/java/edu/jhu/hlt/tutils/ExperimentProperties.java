@@ -166,7 +166,9 @@ public class ExperimentProperties extends java.util.Properties {
 
   public boolean getBoolean(String key) {
     String value = getProperty(key);
-    if (FLIP.equals(value)) {
+    if (value == null) {
+      throw new RuntimeException("Boolean property not provided: " + key);
+    } else if (FLIP.equals(value)) {
       throw new RuntimeException("a property/argument set the default value to \""
           + FLIP + "\" which means that you cannot ask for \"" + key
           + "\" without providing a default to flip -- use 2 arg method");
