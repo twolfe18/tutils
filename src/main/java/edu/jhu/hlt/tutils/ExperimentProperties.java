@@ -1,9 +1,18 @@
 package edu.jhu.hlt.tutils;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Methods with defaults will return the default if the key is not in this map,
@@ -241,6 +250,50 @@ public class ExperimentProperties extends java.util.Properties {
       throw new RuntimeException("File property not provided: " + key);
     File f = new File(value);
     return f;
+  }
+
+  public List<File> getFileGlob(String key) {
+    return getFileGlob(key, null);
+  }
+
+  /**
+   * @param key should corresond to a value like "path/to/dir/**\/*.extension",
+   * following the pattern <parent><slash><glob>. Glob must contain a slash.
+   * @param keep may be null (take everything) or can be used to restrict matches.
+   */
+  public List<File> getFileGlob(String key, Predicate<File> keep) {
+    String parentGlob = getString(key);
+
+    int i = parentGlob.indexOf("**");
+    if (i < 0)
+      throw new RuntimeException("glob must contain **");
+    File parent = new File(parentGlob.substring(0, i));
+    String glob = "glob:" + parentGlob.substring(i);
+    if (!parent.exists())
+      throw new IllegalArgumentException("parsed out parent=" + parent.getPath() + " doesn't exist");
+
+    ArrayList<File> output = new ArrayList<>();
+    PathMatcher pm = FileSystems.getDefault().getPathMatcher(glob);
+    try {
+      Files.walkFileTree(parent.toPath(), new SimpleFileVisitor<Path>() {
+        @Override
+        public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
+          if (pm.matches(path)) {
+            File f = path.toFile();
+            if (keep == null || keep.test(f))
+              output.add(path.toFile());
+          }
+          return FileVisitResult.CONTINUE;
+        }
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+          return FileVisitResult.CONTINUE;
+        }
+      });
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return output;
   }
 
   public String getString(String key, String defaultValue) {
