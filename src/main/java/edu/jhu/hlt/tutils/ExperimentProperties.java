@@ -14,6 +14,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Predicate;
 
+import edu.jhu.hlt.tutils.ShardUtils.Shard;
+
 /**
  * Methods with defaults will return the default if the key is not in this map,
  * and also add the (key, defaultValue) pair to this map.
@@ -294,6 +296,22 @@ public class ExperimentProperties extends java.util.Properties {
       throw new RuntimeException(e);
     }
     return output;
+  }
+
+  /**
+   * Looks for a key called "<specifier>Shard" or "shard" if speicifier is null.
+   * The value should match "(\d+)[^\d]+(\d+)".
+   */
+  public Shard getShard(String specifier) {
+    String key = specifier == null ? "shard" : specifier + "Shard";
+    String val = getString(key, "0/1");
+    String[] sN = val.split("\\D+", 2);
+    int s = Integer.parseInt(sN[0]);
+    int n = Integer.parseInt(sN[1]);
+    return new Shard(s, n);
+  }
+  public Shard getShard() {
+    return getShard(null);
   }
 
   public String getString(String key, String defaultValue) {

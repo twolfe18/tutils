@@ -22,6 +22,7 @@ public class ShardUtils {
   }
 
   /**
+   * @deprecated Use {@link ExperimentProperties#getShard(String)}
    * @return (shard, numShards)
    * If "shard" and "numShards" properties are not given, then returns
    * (shard=0, numShards=1), which is equivalent to not having any shards.
