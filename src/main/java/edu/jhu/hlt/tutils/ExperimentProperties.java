@@ -301,6 +301,8 @@ public class ExperimentProperties extends java.util.Properties {
   /**
    * Looks for a key called "<specifier>Shard" or "shard" if speicifier is null.
    * The value should match "(\d+)[^\d]+(\d+)".
+   * If no value is found, then shard=0/numShards=1 is returned, meaning "take
+   * all the data".
    */
   public Shard getShard(String specifier) {
     String key = specifier == null ? "shard" : specifier + "Shard";

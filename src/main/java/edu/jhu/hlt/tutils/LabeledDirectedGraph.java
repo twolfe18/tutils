@@ -33,7 +33,7 @@ import edu.jhu.hlt.concrete.util.ConcreteException;
    - general tool for shortest path given two endpoints: http://en.wikipedia.org/wiki/Bidirectional_search
    - may be faster to just do Dijkstra twice, each time going in the "parent" direction (near-trees will have branching factor of 1)
      make sure you use the fibonacci heap version: http://people.cs.kuleuven.be/~jon.sneyers/presentations/dijkstra_chr.pdf
-   - LOOPS?!
+   - loops/cycles?!
      just keep a bitset around for these algorithms to detect loops
 
    All path queries:
@@ -353,6 +353,9 @@ public class LabeledDirectedGraph implements Serializable {
     }
   }
 
+  /**
+   * @param edges must be sorted by node, ascending
+   */
   public static int[] computeSplitPoints(long[] edges) {
     BitSet nodes = new BitSet();
     for (int i = 0; i < edges.length; i++) {
@@ -361,16 +364,20 @@ public class LabeledDirectedGraph implements Serializable {
       nodes.set(unpackConode(e));
     }
     int numNodes = nodes.length();
+    if (DEBUG) {
+      System.out.println("[computeSplitPoints] numNodes=" + numNodes + " nodes=" + nodes);
+    }
     int[] splitPoints = new int[numNodes];
     int ptr = 0;
     for (int i = 0; i < numNodes; i++) {
-      if (DEBUG) System.out.println("[computeSplitPoints] i=" + i);
+      if (DEBUG)
+        System.out.println("[computeSplitPoints] i=" + i);
       if (nodes.get(i)) {
         // We have seen this node, so there will be edges for it.
         // Find the first edge where node==i and is node->conode.
         if (DEBUG)
           System.out.println("looking for node=" + i + " ptr=" + ptr);
-        while (true) {
+        while (ptr < edges.length) {
           long e = edges[ptr];
           int n = unpackNode(e);
           boolean d = unpackDirection(e);
@@ -385,10 +392,12 @@ public class LabeledDirectedGraph implements Serializable {
           }
           ptr++;
         }
-        if (DEBUG) System.out.println("[computeSplitPoints] setting splitPoints[" + i +"] = " + ptr);
+        if (DEBUG)
+          System.out.println("[computeSplitPoints] setting splitPoints[" + i +"] = " + ptr);
         splitPoints[i] = ptr;
       } else {
-        if (DEBUG) System.out.println("[computeSplitPoints] setting splitPoints[" + i +"] = -1");
+        if (DEBUG)
+          System.out.println("[computeSplitPoints] setting splitPoints[" + i +"] = -1");
         splitPoints[i] = -1;
       }
     }
