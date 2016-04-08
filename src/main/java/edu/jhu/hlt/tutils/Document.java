@@ -24,7 +24,7 @@ import edu.jhu.hlt.tutils.ling.Language;
  * cons_ptb_gold and cons_propbank_auto) are stored in separate arrays. This
  * could even have the additional benefit of being able to free certain columns
  * on a per-parse basis, thus saving memory. The REASON not to do this is that
- * by having them all in one (indexing) "universe", i.e. datastructure, they can
+ * by having them all in one (indexing) "universe", i.e. data structure, they can
  * reference each other. You can have Situation constituents which have children
  * which are PTB nodes or Entity nodes, etc.
  *
@@ -40,7 +40,7 @@ import edu.jhu.hlt.tutils.ling.Language;
  *
  * TODO We can get rid of leftSib/rigthSib by placing constraints on the
  * ordering used to store Constituents. Namely: siblings can be laid out next to
- * each othe in the arrays that house them. The rightSibling is always at
+ * each other in the arrays that house them. The rightSibling is always at
  * index+1 and the left sibling is always at index-1. You can check if you are
  * the first or last sibling by inspecting the two parents (if they are the same
  * then they're siblings). Loops over siblings used to read rightSib/leftSib and
@@ -48,7 +48,7 @@ import edu.jhu.hlt.tutils.ling.Language;
  * and don't even need to store rightSib/leftSib.
  * THERE is a DOWNSIDE to this approach: it makes building trees harder. You
  * have to build in a depth-first fashion. As such, I think it is best to add
- * this way of storing nodes as an optional data transform. A user would biuld
+ * this way of storing nodes as an optional data transform. A user would build
  * a tree however they like (likely with rightSib/leftSib) and then call a
  * "packSiblings" method. This method would need to operate over all Constituent
  * trees. After it ran, siblings would be adjacent and the rightSib/leftSib
@@ -846,6 +846,12 @@ public final class Document implements Serializable {
     public Constituent getRightSibC() { return new Constituent(rightSib[index]); }
     public Constituent getRightChildC() { return new Constituent(rightChild[index]); }
     public Constituent getLeftSibC() { return new Constituent(leftSib[index]); }
+
+    public ConstituentItr getParentCI() { return new ConstituentItr(parent[index]); }
+    public ConstituentItr getLeftChildCI() { return new ConstituentItr(leftChild[index]); }
+    public ConstituentItr getRightSibCI() { return new ConstituentItr(rightSib[index]); }
+    public ConstituentItr getRightChildCI() { return new ConstituentItr(rightChild[index]); }
+    public ConstituentItr getLeftSibCI() { return new ConstituentItr(leftSib[index]); }
 
     public int getLhs() { return lhs[index]; }
     public int getDepth() { return depth[index]; }
