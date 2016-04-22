@@ -8,18 +8,23 @@ package edu.jhu.hlt.tutils;
 public class ArgMin<T> {
   private T bestItem;
   private double bestScore;
+  private int offers = 0;
 
   public void offer(T item, double score) {
     if (item == null || Double.isInfinite(score) || Double.isNaN(score))
       throw new IllegalArgumentException();
+    offers++;
     if (bestItem == null || score < bestScore) {
       bestItem = item;
       bestScore = score;
     }
   }
 
+  public int numOffers() {
+    return offers;
+  }
+
   public T get() {
-    assert bestItem != null;
     return bestItem;
   }
 }
