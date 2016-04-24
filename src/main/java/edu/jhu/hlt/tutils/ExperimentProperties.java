@@ -233,6 +233,23 @@ public class ExperimentProperties extends java.util.Properties {
     return f;
   }
 
+  /**
+   * Value for this key should be a comma separated list of files, each of which
+   * exists.
+   */
+  public List<File> getExistingFiles(String key) {
+    String s = getString(key);
+    String[] ss = s.split(",");
+    List<File> files = new ArrayList<>();
+    for (String fn : ss) {
+      File f = new File(fn);
+      if (!f.isFile())
+        throw new RuntimeException("ExistingFiles key=" + key + " f=" + fn + " is not a file");
+      files.add(f);
+    }
+    return files;
+  }
+
   public File getFile(String key, File defaultValue) {
     String value = getProperty(key);
     File f;
