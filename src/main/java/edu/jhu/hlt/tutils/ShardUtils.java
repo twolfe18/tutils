@@ -8,16 +8,29 @@ public class ShardUtils {
 
   public static class Shard extends IntPair {
     private static final long serialVersionUID = 8002427683485461635L;
+
     public Shard(int shard, int numShards) {
       super(shard, numShards);
       if (shard < 0 || shard >= numShards || numShards < 1)
         throw new IllegalArgumentException("shard=" + shard + " numShards=" + numShards);
     }
+
     public int getShard() {
       return first;
     }
+
     public int getNumShards() {
       return second;
+    }
+
+    public boolean matches(int i) {
+      if (i < 0)
+        i = -i;
+      return (i % second) == first;
+    }
+
+    public boolean matches(Object hashable) {
+      return matches(hashable.hashCode());
     }
   }
 
