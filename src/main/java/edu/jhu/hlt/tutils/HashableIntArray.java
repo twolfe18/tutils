@@ -18,7 +18,7 @@ public class HashableIntArray {
   private int[] array;
   private long hash;
 
-  public HashableIntArray(int[] wrapped) {
+  public HashableIntArray(int... wrapped) {
     array = wrapped;
     hash = wrapped[0];
     for (int i = 1; i < wrapped.length; i++)
