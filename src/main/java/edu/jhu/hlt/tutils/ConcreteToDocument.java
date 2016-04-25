@@ -638,6 +638,8 @@ public class ConcreteToDocument {
     int first = Document.NONE;
     int prevSit = Document.NONE;
     for (SituationMention sm : sms.getMentionList()) {
+      if (sm.getTokens() == null && sm.getConstituent() == null)
+        throw new RuntimeException("SituationMention does not provide any target info: " + sm);
 
       // Make a situation node which is the parent of all the pred/args
       Constituent sit = doc.newConstituent();
