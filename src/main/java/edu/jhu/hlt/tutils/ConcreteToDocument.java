@@ -207,6 +207,10 @@ public class ConcreteToDocument {
     lemmaTool = STANFORD_LEMMA;
   }
 
+  public void readTacKbp2015SituationsAsSrl() {
+    propbankToolGold = "TAC KBP 2015 Cold Start Slot Filling";
+  }
+
   /**
    * If you provide null for any of these args it will work but just not set
    * these fields
