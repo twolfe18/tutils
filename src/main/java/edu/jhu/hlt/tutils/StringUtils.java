@@ -19,6 +19,18 @@ public class StringUtils {
     return join(sep, Arrays.asList(items));
   }
 
+  public static String join(String sep, int[] items) {
+    if (items.length == 0)
+      return "";
+    StringBuilder sb = new StringBuilder();
+    sb.append(items[0]);
+    for (int i = 1; i < items.length; i++) {
+      sb.append(sep);
+      sb.append(items[i]);
+    }
+    return sb.toString();
+  }
+
   // Java String.join requires string elements...
   public static String join(String sep, Iterable<?> items) {
     StringBuilder sb = new StringBuilder();
