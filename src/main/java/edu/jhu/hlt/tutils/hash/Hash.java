@@ -68,6 +68,14 @@ public class Hash {
     return h;
   }
 
+  @SafeVarargs
+  public static <T> int mixHashcodes(T... items) {
+    int[] hc = new int[items.length];
+    for (int i = 0; i < hc.length; i++)
+      hc[i] = items[i].hashCode();
+    return mix(hc);
+  }
+
   public static int mix(int... items) {
     if (items.length == 0)
       return 0;
