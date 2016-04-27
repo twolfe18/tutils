@@ -44,9 +44,9 @@ public class ProductIndex implements Serializable {
     this.derivedFrom = derivedFrom;
     this.arity = derivedFrom.arity + 1;
     assert feat >= 0 && card >= 0;
-    assert featProd >= 0;
-    assert cardProd >= 0;
-    assert featProd < cardProd || cardProd == 0;
+    assert featProd >= 0 : "featProd=" + featProd + " which should be >=0";
+    assert cardProd >= 0 : "cardProd=" + cardProd + " which should be >=0";
+    assert featProd < cardProd || cardProd == 0 : "featProd=" + featProd + " which should be smaller than cardProd=" + cardProd;
     assert feat < card || card == 0;
   }
 
@@ -178,6 +178,7 @@ public class ProductIndex implements Serializable {
 
   /** You loose the chain in the argument, calls getProd(Feat|Card)Safe */
   public ProductIndex flatProd(ProductIndex other) {
+    assert other.getProdCardinality() > 0 : "consider using destructiveProd";
     return prod(other.getProdFeature(), other.getProdCardinality());
   }
 
