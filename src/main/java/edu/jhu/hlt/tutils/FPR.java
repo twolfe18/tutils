@@ -1,5 +1,8 @@
 package edu.jhu.hlt.tutils;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Computes precision, recall, and F1.
  *
@@ -10,6 +13,27 @@ package edu.jhu.hlt.tutils;
  */
 public final class FPR {
   public static enum Mode { PRECISION, RECALL, F1 }
+
+  /**
+   * Should be a hashable type.
+   */
+  public static <T> FPR fromSets(Set<T> gold, Set<T> predicted) {
+    Set<T> all = new HashSet<>();
+    all.addAll(gold);
+    all.addAll(predicted);
+    FPR fpr = new FPR();
+    for (T item : all) {
+      boolean g = gold.contains(item);
+      boolean p = predicted.contains(item);
+      if (p && !g)
+        fpr.accumFP();
+      else if (p && g)
+        fpr.accumTP();
+      else if (!p && g)
+        fpr.accumFN();
+    }
+    return fpr;
+  }
 
   private double pSum = 0d, pZ = 0d;
   private double rSum = 0d, rZ = 0d;
