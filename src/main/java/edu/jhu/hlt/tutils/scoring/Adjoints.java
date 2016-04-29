@@ -170,6 +170,9 @@ public interface Adjoints {
       this.wrapped = wrapped;
       this.computed = false;
     }
+    public Adjoints getWrapped() {
+      return wrapped;
+    }
     @Override
     public double forwards() {
       if (!computed) {
@@ -222,6 +225,16 @@ public interface Adjoints {
     if (a instanceof ICaching)
       return (ICaching) a;
     return new Caching(a);
+  }
+
+  /** If you called cacheIfNeeded() to wrap some adjoints in order to cache the
+   * forwards computation, this function will un-wrap that cache and return the
+   * original Adjoints.
+   */
+  public static Adjoints uncacheIfNeeded(Adjoints a) {
+    if (a instanceof Caching)
+      return ((Caching) a).getWrapped();
+    return a;
   }
 
   /**
