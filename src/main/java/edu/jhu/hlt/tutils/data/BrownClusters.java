@@ -2,17 +2,16 @@ package edu.jhu.hlt.tutils.data;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 
 import edu.jhu.hlt.tutils.Document;
+import edu.jhu.hlt.tutils.Document.Token;
 import edu.jhu.hlt.tutils.ExperimentProperties;
 import edu.jhu.hlt.tutils.FileUtil;
 import edu.jhu.hlt.tutils.Log;
 import edu.jhu.hlt.tutils.MultiAlphabet;
-import edu.jhu.hlt.tutils.Document.Token;
+import edu.jhu.hlt.tutils.StringUtils;
 
 /**
  * Thin wrapper around the output of Percy Liang's brown clustering code output
@@ -20,10 +19,13 @@ import edu.jhu.hlt.tutils.Document.Token;
  * @author travis
  */
 public class BrownClusters {
+  public static boolean DEBUG = false;
 
   private Map<String, String> word2path;
 
   public BrownClusters(File pathToPercyOutput) {
+    if (DEBUG)
+      Log.info("calling from:\n" + StringUtils.join("\n", new Exception().getStackTrace()));
     Log.info("loading Brown clusters from " + pathToPercyOutput.getPath());
     if (!pathToPercyOutput.isDirectory()) {
       throw new IllegalArgumentException(
