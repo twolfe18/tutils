@@ -5,6 +5,23 @@ import java.security.MessageDigest;
 
 public class Hash {
 
+  public static int hash(String s) {
+    return hash(s, 0, s.length());
+  }
+  public static int hash(String s, int start, int end) {
+    int h = 0;
+    for (int i = start; i < end; i++) {
+      char c = s.charAt(i);
+      h += c;
+      h += (h << 10);
+      h ^= (h >> 6);
+    }
+    h += (h << 3);
+    h ^= (h >> 11);
+    h += (h << 15);
+    return h;
+  }
+
   /**
    * Adapted from Jenkins hash:
    * https://en.wikipedia.org/wiki/Jenkins_hash_function
