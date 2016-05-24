@@ -39,7 +39,7 @@ public final class FPR {
   private double rSum = 0d, rZ = 0d;
   private boolean macro;
 
-  private double tp, fp, fn;	// ignores macro/micro
+  private double tp, fp, fn;  // ignores macro/micro
 
   public FPR() {
     this(false);
@@ -72,8 +72,7 @@ public final class FPR {
       pZ += 1d;
       rSum += tp + fn == 0d ? 1d : tp / (tp + fn);
       rZ += 1d;
-    }
-    else {
+    } else {
       pSum += tp;
       pZ += tp + fp;
       rSum += tp;
@@ -96,6 +95,9 @@ public final class FPR {
       throw new IllegalArgumentException(
           "two different types of FPR! this=" + macro + " other=" + fpr.macro);
     }
+    tp += fpr.tp;
+    fn += fpr.fn;
+    fp += fpr.fp;
     pSum += fpr.pSum;
     pZ += fpr.pZ;
     rSum += fpr.rSum;

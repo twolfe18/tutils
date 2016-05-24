@@ -9,6 +9,8 @@ public class ShardUtils {
   public static class Shard extends IntPair {
     private static final long serialVersionUID = 8002427683485461635L;
 
+    public static final Shard ONLY = new Shard(0, 1);
+
     public Shard(int shard, int numShards) {
       super(shard, numShards);
       if (shard < 0 || shard >= numShards || numShards < 1)
