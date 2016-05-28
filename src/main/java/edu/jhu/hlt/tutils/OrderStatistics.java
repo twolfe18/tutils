@@ -37,7 +37,7 @@ public class OrderStatistics<T> extends ArrayList<T> {
   }
 
   /**
-   * NOTE: This mehtod is not safe and will throw an Exception if T doesn't
+   * NOTE: This method is not safe and will throw an Exception if T doesn't
    * implement {@link Number}
    */
   public double getMean() {
@@ -47,7 +47,7 @@ public class OrderStatistics<T> extends ArrayList<T> {
   }
 
   /**
-   * NOTE: This mehtod is not safe and will throw an Exception if T doesn't
+   * NOTE: This method is not safe and will throw an Exception if T doesn't
    * implement {@link Number}
    */
   public double getSum() {

@@ -238,6 +238,23 @@ public class ExperimentProperties extends java.util.Properties {
    * exists.
    */
   public List<File> getExistingFiles(String key) {
+    List<File> f = getExistingFiles(key, null);
+    if (f == null)
+      throw new RuntimeException("ExstingFileS not specified: " + key);
+    return f;
+  }
+
+  /**
+   * Value for this key should be a comma separated list of files, each of which
+   * exists. Default values are also checked for existence.
+   */
+  public List<File> getExistingFiles(String key, List<File> defaultFiles) {
+    if (!containsKey(key)) {
+      for (File f : defaultFiles)
+        if (!f.isFile())
+          throw new IllegalArgumentException("default was not existing file: " + f.getPath());
+      return defaultFiles;
+    }
     String s = getString(key);
     String[] ss = s.split(",");
     List<File> files = new ArrayList<>();
