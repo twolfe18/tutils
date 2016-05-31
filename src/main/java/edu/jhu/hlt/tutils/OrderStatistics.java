@@ -41,9 +41,7 @@ public class OrderStatistics<T> extends ArrayList<T> {
    * implement {@link Number}
    */
   public double getMean() {
-    int n = size();
-    assert n > 0;
-    return getSum() / n;
+    return getSum() / size();
   }
 
   /**

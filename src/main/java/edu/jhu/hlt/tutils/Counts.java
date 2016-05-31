@@ -187,7 +187,10 @@ public class Counts<T> implements Serializable {
     return l;
   }
 
-  public void clear() { counts.clear(); }
+  public void clear() {
+    counts.clear();
+    total = 0;
+  }
 
   public Comparator<T> ascendingComparator() {
     return new Comparator<T>() {
