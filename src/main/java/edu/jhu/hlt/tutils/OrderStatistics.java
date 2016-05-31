@@ -89,6 +89,8 @@ public class OrderStatistics<T> extends ArrayList<T> {
   }
 
   public String getOrdersStr() {
+    if (DEFAULT_ORDERS.size() > size())
+      return "notEnoughData";
     List<T> t = getOrders();
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < DEFAULT_ORDERS.size(); i++) {

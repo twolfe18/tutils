@@ -134,12 +134,13 @@ public class Timer {
       spc *= 1000;
       spcUnit = "ms/call";
     }
+    String logSPC = String.format("log(sec/call)=%.1f", logSecPerCall());
     String timeHist = "";
     if (showTimeHistInToString) {
       timeHist = " hist=" + getTimeHist();
     }
-    return String.format("<Timer %s %.2f sec and %d calls total, %.3f %s%s>",
-        id, totalTimeInSeconds(), count, spc, spcUnit, timeHist);
+    return String.format("<Timer %s %.2f sec and %d calls total, %s %s=%.3f%s>",
+        id, totalTimeInSeconds(), count, logSPC, spcUnit, spc, timeHist);
   }
 
   public double countsPerMSec() {
@@ -152,6 +153,12 @@ public class Timer {
     if(count > 1)
       return ((totalTime - firstTime)/1000d) / (count-1);
     return (totalTime/1000d) / count;
+  }
+
+  public double logSecPerCall() {
+    if(count > 1)
+      return Math.log((totalTime - firstTime)/1000d) - Math.log(count-1);
+    return Math.log(totalTime/1000d) - Math.log(count);
   }
 
   public double minutesUntil(int iterations) {

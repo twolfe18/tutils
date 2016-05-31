@@ -67,6 +67,11 @@ public class MultiTimer {
     return (System.currentTimeMillis() - firstStart) / 1000d;
   }
 
+  public void printAll(PrintStream ps) {
+    for (String key : timers.keySet())
+      print(ps, key);
+  }
+
   public void print(PrintStream ps, String key) {
     Timer t = timers.get(key);
     if(t == null)

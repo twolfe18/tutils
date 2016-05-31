@@ -11,7 +11,9 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 
 import edu.jhu.hlt.tutils.ShardUtils.Shard;
@@ -238,6 +240,8 @@ public class ExperimentProperties extends java.util.Properties {
    * exists.
    */
   public List<File> getExistingFiles(String key) {
+    if (!containsKey(key))
+      throw new RuntimeException("ExstingFileS not specified: " + key);
     List<File> f = getExistingFiles(key, null);
     if (f == null)
       throw new RuntimeException("ExstingFileS not specified: " + key);
@@ -250,6 +254,8 @@ public class ExperimentProperties extends java.util.Properties {
    */
   public List<File> getExistingFiles(String key, List<File> defaultFiles) {
     if (!containsKey(key)) {
+      if (defaultFiles == null)
+        throw new IllegalArgumentException("[getExistingFiles] no key (" + key + "), null default");
       for (File f : defaultFiles)
         if (!f.isFile())
           throw new IllegalArgumentException("default was not existing file: " + f.getPath());
@@ -265,6 +271,24 @@ public class ExperimentProperties extends java.util.Properties {
       files.add(f);
     }
     return files;
+  }
+
+  /**
+   * @param key corresponds to a value which is one or more "<key>:<value>"
+   * strings separated by commas.
+   */
+  public Map<String, String> getMapping(String key) {
+    String entries = getString(key);
+    Map<String, String> m = new HashMap<>();
+    for (String t : entries.split(",")) {
+      String[] kv = t.split(":");
+      if (kv.length != 2)
+        throw new IllegalArgumentException("must be <key>:<value> separted by commas: " + entries + ", in particular: " + t);
+      String old = m.put(kv[0], kv[1]);
+      if (old != null && !old.equals(kv[1]))
+        throw new IllegalArgumentException(kv[0] + " is mapped to old=" + old + " and new=" + kv[1]);
+    }
+    return m;
   }
 
   public File getFile(String key, File defaultValue) {
