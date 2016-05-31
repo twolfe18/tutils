@@ -228,18 +228,14 @@ Z(4) = 4*3/2 = 6
   }
 
   public static Span inverseShortString(String s) {
-    int sep = s.indexOf(',');
+    int sep = s.indexOf('-');
     if (sep < 0)
-      sep = s.indexOf('-');
+      sep = s.indexOf(',');
     if (sep < 0)
       throw new IllegalArgumentException("must match \"\\d+[-,]\\d+\":" + s);
     int start = Integer.parseInt(s.substring(0, sep));
     int end = Integer.parseInt(s.substring(sep + 1, s.length()));
     return getSpan(start, end);
-//    String[] toks = s.split("-");
-//    if (toks.length != 2)
-//      throw new IllegalArgumentException("bad format: " + s);
-//    return getSpan(Integer.parseInt(toks[0]), Integer.parseInt(toks[1]));
   }
 
   /** Argument may be null */
