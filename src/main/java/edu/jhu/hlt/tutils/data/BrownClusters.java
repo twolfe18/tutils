@@ -23,29 +23,66 @@ public class BrownClusters {
 
   private Map<String, String> word2path;
 
+  // TODO Consider filtering by frequency:
+  // /home/travis/code/fnparse/data/embeddings/bc_out_256/full.txt_en_256
+  // head paths
+  //  0000000 Fierecillos     2
+  //  0000000 Golab-e 2
+  //  0000000 nadmorski       2
+  //  0000000 Trumshing       2
+  //  0000000 BosniaThe       2
+  //  0000000 Radanja 2
+  //  0000000 FEMUSC  2
+  //  0000000 TOŠK    2
+  //  0000000 Sheder  2
+  //  0000000 Adansiman       2
+  //  caligula full.txt_en_256 $ awk '{print $1}' <paths | wc -l
+  //  3805621
+  //  caligula full.txt_en_256 $ awk '$3 >= 3 {print $1}' <paths | wc -l
+  //  2626651
+  //  caligula full.txt_en_256 $ awk '$3 >= 4 {print $1}' <paths | wc -l
+  //  2099093
+  //  caligula full.txt_en_256 $ awk '$3 >= 5 {print $1}' <paths | wc -l
+  //  1778575
+  //  caligula full.txt_en_256 $ awk '$3 >= 6 {print $1}' <paths | wc -l
+  //  1562592
+  //  caligula full.txt_en_256 $ awk '$3 >= 7 {print $1}' <paths | wc -l
+  //  1401029
+  // I checked with propbank, and there are NO words which occur in the count==2 subset of the BC data
   public BrownClusters(File pathToPercyOutput) {
+    this(pathToPercyOutput, 3);
+  }
+  public BrownClusters(File pathToPercyOutput, int minCount) {
     if (DEBUG)
       Log.info("calling from:\n" + StringUtils.join("\n", new Exception().getStackTrace()));
-    Log.info("loading Brown clusters from " + pathToPercyOutput.getPath());
+    Log.info("loading path=" + pathToPercyOutput.getPath() + " minCount=" + minCount);
     if (!pathToPercyOutput.isDirectory()) {
       throw new IllegalArgumentException(
           "not a directory: " + pathToPercyOutput.getPath());
           //"should give a path that contains a file called \"path\"");
     }
+    int discarded = 0;
     File pathFile = new File(pathToPercyOutput, "paths");
     word2path = new HashMap<>();
     try (BufferedReader r = FileUtil.getReader(pathFile)) {
       for (String line = r.readLine(); line != null; line = r.readLine()) {
         String[] toks = line.split("\t");
-        String path = toks[0];
+        String path = toks[0].intern();
         String word = toks[1];
-        //int frequency = Integer.parseInt(toks[2]);
-        String old = word2path.put(word, path);
-        assert old == null;
+        int frequency = Integer.parseInt(toks[2]);
+        if (frequency >= minCount) {
+          String old = word2path.put(word, path);
+          assert old == null;
+        } else {
+          discarded++;
+        }
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+    long estStrSize = 2 * 7;
+    long estBytes = (long) (word2path.size() * (estStrSize + 8) * 1.6d);
+    Log.info("with minCount=" + minCount + " discarded=" + discarded + " kept=" + word2path.size() + " estSize=" + (estBytes/(1L << 20) + "MB"));
   }
 
   public String getPath(String word) {

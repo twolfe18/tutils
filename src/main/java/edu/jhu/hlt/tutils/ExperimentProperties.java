@@ -374,6 +374,47 @@ public class ExperimentProperties extends java.util.Properties {
     return getShard(null);
   }
 
+  /**
+   * Value is comma-separated string
+   */
+  public String[] getStrings(String key) {
+    String value = getProperty(key);
+    if (value == null)
+      throw new RuntimeException("comma-separated string value not found for key: " + key);
+    return value.split(",");
+//    return getStrings(key, ",");
+  }
+//  public String[] getStrings(String key, String sep) {
+//    String value = getProperty(key);
+//    if (value == null)
+//      throw new RuntimeException("comma-separated string value not found for key: " + key);
+//    return value.split(sep);
+//  }
+  public String[] getStrings(String key, String[] defaultValue) {
+    String value = getProperty(key);
+    if (value == null) {
+      put(key, StringUtils.join(",", defaultValue));
+      return defaultValue;
+    }
+    return value.split(",");
+  }
+//  public String[] getStrings(String key, String sep, String[] defaultValue) {
+//    String value = getProperty(key);
+//    if (value == null) {
+//      put(key, StringUtils.join(sep, defaultValue));
+//      return defaultValue;
+//    }
+//    return value.split(sep);
+//  }
+  public String[] getStrings(String key, String defaultValue) {
+    String value = getProperty(key);
+    if (value == null) {
+      put(key, defaultValue);
+      return new String[] {defaultValue};
+    }
+    return value.split(",");
+  }
+
   public String getString(String key, String defaultValue) {
     String value = getProperty(key);
     if (value == null) {
