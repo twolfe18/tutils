@@ -27,8 +27,19 @@ public interface Adjoints {
    */
   public void backwards(double dErr_dForwards);
 
+  /**
+   * Contains a cache/memo for the value of forwards. Any time backwards is
+   * called, this cache is invalidated. NOTE: This is necessary, but not
+   * sufficient for correctness, e.g.
+   *   a1 = dot(f(x), theta)
+   *   a2 = dot(f(x), theta)  // assume dot/f are ref transparent, want a1 == a2
+   *   a1.forwards() // 1
+   *   a2.forwards() // 1
+   *   a1.backwards(-1)
+   *   a1.forwards() // 2
+   *   a2.forwards() // 1, invalid cache!
+   */
   public interface ICaching extends Adjoints {
-    // forwards has its value cached for the life of the instance
   }
 
   /** Adjoints representing a value which cannot be updated with backwards */
@@ -107,19 +118,25 @@ public interface Adjoints {
     private static final long serialVersionUID = 1409636835431295798L;
     private Adjoints left, right;
     private double forwards;
+    private boolean dirty;
     public CachingBinarySum(Adjoints left, Adjoints right) {
       this.left = left;
       this.right = right;
-      this.forwards = left.forwards() + right.forwards();
+      this.dirty = true;
     }
     @Override
     public double forwards() {
+      if (dirty) {
+        this.forwards = left.forwards() + right.forwards();
+        this.dirty = false;
+      }
       return forwards;
     }
     @Override
     public void backwards(double dErr_dForwards) {
       left.backwards(dErr_dForwards);
       right.backwards(dErr_dForwards);
+      dirty = true;
     }
     @Override
     public String toString() {
@@ -130,14 +147,19 @@ public interface Adjoints {
     private static final long serialVersionUID = 5628255488165277061L;
     private Adjoints a, b, c;
     private double forwards;
+    private boolean dirty;
     public CachingTernarySum(Adjoints a, Adjoints b, Adjoints c) {
       this.a = a;
       this.b = b;
       this.c = c;
-      this.forwards = a.forwards() + b.forwards() + c.forwards();
+      this.dirty = true;
     }
     @Override
     public double forwards() {
+      if (dirty) {
+        this.forwards = a.forwards() + b.forwards() + c.forwards();
+        this.dirty = false;
+      }
       return forwards;
     }
     @Override
@@ -145,6 +167,7 @@ public interface Adjoints {
       a.backwards(dErr_dForwards);
       b.backwards(dErr_dForwards);
       c.backwards(dErr_dForwards);
+      dirty = true;
     }
     @Override
     public String toString() {
@@ -184,6 +207,7 @@ public interface Adjoints {
     @Override
     public void backwards(double dErr_dForwards) {
       wrapped.backwards(dErr_dForwards);
+      computed = false;
     }
     @Override
     public String toString() {
@@ -213,6 +237,7 @@ public interface Adjoints {
     @Override
     public void backwards(double dErr_dForwards) {
       wrapped.backwards(dErr_dForwards);
+      computed = false;
     }
     @Override
     public String toString() {
