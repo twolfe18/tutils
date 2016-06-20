@@ -134,6 +134,7 @@ public class FileUtil {
   public static Object deserialize(File f) {
     if (VERBOSE)
       Log.info("reading from " + f.getPath());
+    long s = System.currentTimeMillis();
     Object out = null;
     try (FileInputStream fis = new FileInputStream(f);
         ObjectInputStream oos = f.getName().toLowerCase().endsWith(".gz")
@@ -143,6 +144,8 @@ public class FileUtil {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+    double sec = (System.currentTimeMillis() - s) / 1000d;
+    Log.info(String.format("too %.2f sec to read from %s", sec, f.getPath()));
     return out;
   }
 
