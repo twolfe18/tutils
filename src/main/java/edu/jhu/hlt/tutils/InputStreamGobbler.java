@@ -7,12 +7,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class InputStreamGobbler extends Thread {
+
   private InputStream is;
   private List<String> lines;
+
   public InputStreamGobbler(InputStream is) {
     this.is = is;
     this.lines = new ArrayList<>();
   }
+
   @Override
   public void run() {
     try (BufferedReader r = new BufferedReader(new InputStreamReader(is))) {
@@ -23,6 +26,7 @@ public class InputStreamGobbler extends Thread {
       throw new RuntimeException(e);
     }
   }
+
   public List<String> getLines() {
     return lines;
   }

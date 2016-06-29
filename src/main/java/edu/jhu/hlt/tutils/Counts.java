@@ -140,6 +140,24 @@ public class Counts<T> implements Serializable {
     return sb.toString();
   }
 
+  /**
+   * Returns a string in <key>=<value> format
+   */
+  public String toStringWithEq() {
+    StringBuilder sb = null;
+    for (T t : getKeysSortedByCount(true)) {
+      int c = getCount(t);
+      if (sb == null)
+        sb = new StringBuilder();
+      else
+        sb.append(' ');
+      sb.append(t + "=" + c);
+    }
+    if (sb == null)
+      return "";
+    return sb.toString();
+  }
+
   /** Will hit a runtime error if keys is not comparable */
   @SuppressWarnings({ "unchecked", "rawtypes" })
   public List<T> getKeysSorted() {

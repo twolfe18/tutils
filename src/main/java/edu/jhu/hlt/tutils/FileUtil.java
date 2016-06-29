@@ -119,6 +119,14 @@ public class FileUtil {
     return is;
   }
 
+  public static InputStream getInputStreamOrBlowup(File f) {
+    try {
+      return getInputStream(f);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public static BufferedReader getReader(File f) throws IOException {
     return new BufferedReader(new InputStreamReader(getInputStream(f)));
   }
