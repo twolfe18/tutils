@@ -69,6 +69,28 @@ public interface Adjoints {
     public static final Constant POSITIVE_INFINITY = new Constant(Double.POSITIVE_INFINITY);
   }
 
+  public static class Named implements Adjoints, Serializable {
+    private static final long serialVersionUID = 8684794992448142659L;
+    private Adjoints wrapped;
+    private String name;
+    public Named(String name, Adjoints wrapped) {
+      this.name = name;
+      this.wrapped = wrapped;
+    }
+    @Override
+    public String toString() {
+      return "(" + name + " " + wrapped + ")";
+    }
+    @Override
+    public double forwards() {
+      return wrapped.forwards();
+    }
+    @Override
+    public void backwards(double dErr_dForwards) {
+      wrapped.backwards(dErr_dForwards);
+    }
+  }
+
   public static class NamedConstant extends Constant implements ICaching {
     private static final long serialVersionUID = 6211238756720056089L;
     private String name;
