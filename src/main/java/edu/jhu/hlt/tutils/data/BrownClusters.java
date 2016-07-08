@@ -20,8 +20,11 @@ import edu.jhu.hlt.tutils.StringUtils;
  */
 public class BrownClusters {
   public static boolean DEBUG = false;
+  public static boolean LAZY_LOAD = true;
 
   private Map<String, String> word2path;
+  private File pathToPercyOutput;
+  private int minCount;
 
   // TODO Consider filtering by frequency:
   // /home/travis/code/fnparse/data/embeddings/bc_out_256/full.txt_en_256
@@ -55,14 +58,25 @@ public class BrownClusters {
   public BrownClusters(File pathToPercyOutput, int minCount) {
     if (DEBUG)
       Log.info("calling from:\n" + StringUtils.join("\n", new Exception().getStackTrace()));
-    Log.info("loading path=" + pathToPercyOutput.getPath() + " minCount=" + minCount);
-    if (!pathToPercyOutput.isDirectory()) {
+    this.pathToPercyOutput = pathToPercyOutput;
+    this.minCount = minCount;
+    if (!pathToPercyOutput.isDirectory() || !pathFile().isFile()) {
       throw new IllegalArgumentException(
           "not a directory: " + pathToPercyOutput.getPath());
           //"should give a path that contains a file called \"path\"");
     }
+    if (!LAZY_LOAD)
+      init();
+  }
+
+  private File pathFile() {
+    return new File(pathToPercyOutput, "paths");
+  }
+
+  private void init() {
+    Log.info("loading path=" + pathToPercyOutput.getPath() + " minCount=" + minCount);
     int discarded = 0;
-    File pathFile = new File(pathToPercyOutput, "paths");
+    File pathFile = pathFile();
     word2path = new HashMap<>();
     try (BufferedReader r = FileUtil.getReader(pathFile)) {
       for (String line = r.readLine(); line != null; line = r.readLine()) {
@@ -90,6 +104,8 @@ public class BrownClusters {
   }
 
   public String getPath(String word, int maxLen) {
+    if (word2path == null)
+      init();
     String p = word2path.get(word);
     if (p == null) p = "???";
     if (p.length() > maxLen)
