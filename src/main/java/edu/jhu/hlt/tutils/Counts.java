@@ -107,8 +107,9 @@ public class Counts<T> implements Serializable {
   /** Returns the count before the update */
   public int update(T t, int delta) {
     int c = getCount(t);
-    if (c < 0)
-      throw new RuntimeException("item: " + t);
+    long cc = ((long) c) + delta;
+    if (cc > Integer.MAX_VALUE || cc < Integer.MIN_VALUE)
+      Log.info("WARNING: overflow! key=" + t + " count=" + cc + " delta=" + delta);
     counts.put(t, c + delta);
     total += delta;
     return c;
