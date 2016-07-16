@@ -371,6 +371,8 @@ public interface Adjoints {
     public WithLearningRate(double lr, Adjoints wrapped) {
       if (!Double.isFinite(lr))
         throw new IllegalArgumentException();
+      if (Double.isNaN(lr))
+        throw new IllegalArgumentException();
       this.wrapped = wrapped;
       this.learningRate = lr;
     }
@@ -381,7 +383,13 @@ public interface Adjoints {
 
     @Override
     public void backwards(double dErr_dForwards) {
-      wrapped.backwards(learningRate * dErr_dForwards);
+      if (learningRate != 0)
+        wrapped.backwards(learningRate * dErr_dForwards);
+    }
+
+    @Override
+    public String toString() {
+      return String.format("(LearningRate %.2f %s)", learningRate, wrapped);
     }
   }
 
