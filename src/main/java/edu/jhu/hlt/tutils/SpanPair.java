@@ -43,4 +43,9 @@ public class SpanPair implements Serializable {
   public Span get2() {
     return Span.getSpan(bStart, bEnd);
   }
+
+  @Override
+  public String toString() {
+    return "(" + get1() + ", " + get2() + ")";
+  }
 }

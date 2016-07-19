@@ -2,13 +2,8 @@ package edu.jhu.hlt.tutils;
 
 import java.io.Serializable;
 
-/**
- * Take an argmin over a set which has double-valued scores.
- *
- * @author travis
- */
-public class ArgMin<T> implements Serializable {
-  private static final long serialVersionUID = -2419317323319510333L;
+public class ArgMax<T> implements Serializable {
+  private static final long serialVersionUID = 5760960133608840784L;
 
   private T bestItem;
   private double bestScore;
@@ -18,7 +13,7 @@ public class ArgMin<T> implements Serializable {
     if (item == null || Double.isInfinite(score) || Double.isNaN(score))
       throw new IllegalArgumentException();
     offers++;
-    if (bestItem == null || score < bestScore) {
+    if (bestItem == null || score > bestScore) {
       bestItem = item;
       bestScore = score;
     }
