@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.Comparator;
 import java.util.Random;
 
 import edu.jhu.hlt.concrete.TokenRefSequence;
@@ -12,6 +13,22 @@ import edu.jhu.hlt.tutils.hash.Hash;
 
 public final class Span implements Comparable<Span>, Serializable {
   private static final long serialVersionUID = -7592836078770608357L;
+
+  public static final Comparator<Span> BY_WIDTH_ASC = new Comparator<Span>() {
+    @Override
+    public int compare(Span o1, Span o2) {
+      return o1.width() - o2.width();
+    }
+  };
+  public static final Comparator<Span> BY_END_LR_THEN_WIDTH_THIN = new Comparator<Span>() {
+    @Override
+    public int compare(Span o1, Span o2) {
+      int i = o1.end - o2.end;
+      if (i != 0)
+        return i;
+      return o1.width() - o2.width();
+    }
+  };
 
   private void writeObject(ObjectOutputStream out) throws IOException {
     out.writeInt(start);
