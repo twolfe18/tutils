@@ -1,6 +1,9 @@
 package edu.jhu.hlt.tutils;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 /**
@@ -33,6 +36,35 @@ public final class FPR {
         fpr.accumFN();
     }
     return fpr;
+  }
+
+  /**
+   * Takes the union of keys. For FPR which appear in both arguments, their
+   * counts are added.
+   */
+  public static <T> Map<T, FPR> combineStratifiedPerf(Map<T, FPR> a, Map<T, FPR> b) {
+    Map<T, FPR> c = new HashMap<>();
+    // c += a
+    for (Entry<T, FPR> x : a.entrySet()) {
+      FPR aa = x.getValue();
+      FPR cc = c.get(x.getKey());
+      if (cc == null) {
+        cc = new FPR();
+        c.put(x.getKey(), cc);
+      }
+      cc.accum(aa);
+    }
+    // c += b
+    for (Entry<T, FPR> x : b.entrySet()) {
+      FPR bb = x.getValue();
+      FPR cc = c.get(x.getKey());
+      if (cc == null) {
+        cc = new FPR();
+        c.put(x.getKey(), cc);
+      }
+      cc.accum(bb);
+    }
+    return c;
   }
 
   private double pSum = 0d, pZ = 0d;
