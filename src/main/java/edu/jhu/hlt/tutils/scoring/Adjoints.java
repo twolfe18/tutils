@@ -393,7 +393,35 @@ public interface Adjoints {
     }
   }
 
-  // TODO max, prod, neg, div, etc
+  public static class Max implements Adjoints, Serializable {
+    private static final long serialVersionUID = 1L;
+
+    private Adjoints left, right;
+
+    public Max(Adjoints left, Adjoints right) {
+      this.left = left;
+      this.right = right;
+    }
+
+    @Override
+    public double forwards() {
+      return Math.max(left.forwards(), right.forwards());
+    }
+
+    @Override
+    public void backwards(double dErr_dForwards) {
+      double l = left.forwards();
+      double r = right.forwards();
+      if (l > r) {
+        left.backwards(dErr_dForwards);
+      } else if (r > l) {
+        right.backwards(dErr_dForwards);
+      } else {
+        left.backwards(dErr_dForwards);
+        right.backwards(dErr_dForwards);
+      }
+    }
+  }
 
   public static class SingleHiddenLayer implements Adjoints {
     private IntDoubleVector features;
