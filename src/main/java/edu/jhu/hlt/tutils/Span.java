@@ -5,7 +5,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Random;
 
 import edu.jhu.hlt.concrete.TokenRefSequence;
@@ -102,6 +104,16 @@ Z(4) = 4*3/2 = 6
     int start = enc % (sentenceLen + 1);
     int end = enc / (sentenceLen + 1);
     return getSpan(start, end);
+  }
+
+  public static List<Span> allSpans(int n, boolean includeNullSpan) {
+    List<Span> c = new ArrayList<>();
+    if (includeNullSpan)
+      c.add(nullSpan);
+    for (int i = 0; i < n; i++)
+      for (int j = i+1; j <= n; j++)
+        c.add(getSpan(i, j));
+    return c;
   }
 
   public int start;  // inclusive
