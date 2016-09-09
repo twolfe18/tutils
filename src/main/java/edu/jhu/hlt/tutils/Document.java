@@ -189,6 +189,7 @@ public final class Document implements Serializable {
   // See http://universaldependencies.github.io/docs/u/overview/syntax.html
   public LabeledDirectedGraph universalDependencies;
 
+  public LabeledDirectedGraph parseyMcParseFace;
 
   /* CONVENIENCE METHODS ******************************************************/
 

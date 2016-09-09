@@ -46,7 +46,10 @@ public interface Average {
     }
     @Override
     public void add(double value) {
-      sum = decay * sum + (1d - decay) * value;
+      if (adds == 0)
+        sum = value;
+      else
+        sum = decay * sum + (1d - decay) * value;
       adds++;
     }
     @Override
