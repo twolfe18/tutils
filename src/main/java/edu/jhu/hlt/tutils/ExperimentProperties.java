@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.function.Predicate;
 
 import edu.jhu.hlt.tutils.ShardUtils.Shard;
@@ -430,5 +431,26 @@ public class ExperimentProperties extends java.util.Properties {
     if (value == null)
       throw new RuntimeException("String property not provided: " + key);
     return value;
+  }
+  
+  public Random getRandom() {
+    return getRandom(null);
+  }
+  
+  /**
+   * @param module is a string describing which seed to look for.
+   * E.g. if you have two modules which you would like to be able
+   * to seed independently, call this method with two different strings.
+   *
+   * NOTE: This does not deduplicate instances of {@link Random}, so the
+   * caller must take care not to call this too often (most likely once
+   * per module string value).
+   */
+  public Random getRandom(String module) {
+    String key = "seed";
+    if (module != null)
+      key = key + "." + module;
+    int seed = getInt(key, 9001);
+    return new Random(seed);
   }
 }
