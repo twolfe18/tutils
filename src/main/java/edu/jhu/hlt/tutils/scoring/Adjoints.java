@@ -1,6 +1,7 @@
 package edu.jhu.hlt.tutils.scoring;
 
 import java.io.Serializable;
+import java.util.List;
 
 import edu.jhu.prim.vector.IntDoubleDenseVector;
 import edu.jhu.prim.vector.IntDoubleVector;
@@ -108,9 +109,17 @@ public interface Adjoints {
   public static final class Sum implements Adjoints, Serializable {
     private static final long serialVersionUID = -1294541640504248521L;
     private final Adjoints[] items;
+    
+    public Sum(List<Adjoints> items) {
+      this.items = new Adjoints[items.size()];
+      for (int i = 0; i < this.items.length; i++)
+        this.items[i] = items.get(i);
+    }
+
     public Sum(Adjoints... items) {
       this.items = items;
     }
+
     @Override
     public double forwards() {
       double s = 0;
@@ -118,11 +127,13 @@ public interface Adjoints {
         s += a.forwards();
       return s;
     }
+
     @Override
     public void backwards(double dErr_dForwards) {
       for (Adjoints a : items)
         a.backwards(dErr_dForwards);
     }
+
     @Override
     public String toString() {
       StringBuilder sb = new StringBuilder("(Sum");
@@ -390,6 +401,33 @@ public interface Adjoints {
     @Override
     public String toString() {
       return String.format("(LearningRate %.2f %s)", learningRate, wrapped);
+    }
+  }
+  
+  public static class Prod implements Adjoints, Serializable {
+    private static final long serialVersionUID = 3581177007158902171L;
+
+    private Adjoints left, right;
+    private double leftF, rightF;
+    
+    public Prod(Adjoints left, Adjoints right) {
+      this.left = left;
+      this.right = right;
+    }
+
+    @Override
+    public double forwards() {
+      leftF = left.forwards();
+      rightF = right.forwards();
+      return leftF * rightF;
+    }
+
+    @Override
+    public void backwards(double dErr_dForwards) {
+      // product rule
+      // d(a*b) = d(a)*b + a*d(b)
+      left.backwards(dErr_dForwards * rightF);
+      right.backwards(dErr_dForwards * leftF);
     }
   }
 
