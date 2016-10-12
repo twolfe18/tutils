@@ -21,6 +21,7 @@ import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -30,6 +31,18 @@ import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 public class FileUtil {
   public static boolean VERBOSE = false;
 
+  public static List<String> getLines(File f) {
+    try (BufferedReader r = getReader(f)) {
+      List<String> lines = new ArrayList<>();
+      for (String l = r.readLine(); l != null; l = r.readLine())
+        lines.add(l);
+      return lines;
+    } catch (IOException e) {
+      e.printStackTrace();
+      return null;
+    }
+  }
+  
   public static void rm_rf(File f) {
     Path directory = f.toPath();
     try {
