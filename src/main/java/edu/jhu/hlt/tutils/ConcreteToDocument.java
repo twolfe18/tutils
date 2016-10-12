@@ -100,7 +100,7 @@ public class ConcreteToDocument {
   public boolean debug_cons = false;
   public boolean debug_deps = false;
   public boolean debug_propbank = false;
-  public boolean log_cons_id_conversion = true;   // issue related to concrete Constituent id vs index
+  public boolean log_cons_id_conversion = false;   // issue related to concrete Constituent id vs index
   public boolean log_no_entities = true;
 
   /** See {@link ConcreteDocumentMapping}, if false only keeps a {@link UUID} */
@@ -134,6 +134,12 @@ public class ConcreteToDocument {
   public String propbankToolAuto;      // cons_propbank_auto
 
   /**
+   * Reads the same {@link SituationMention} format as propbankTool*.
+   */
+  public String situationMentionToolGold;      // cons_situationMention_gold
+  public String situationMentionToolAuto;      // cons_situationMention_auto
+
+  /**
    * Looks for an {@link EntitySet} matching this tool name and adds them to
    * {@link Document#cons_coref_gold}.
    */
@@ -159,6 +165,15 @@ public class ConcreteToDocument {
   protected IRAMDictionary wnDict;
 
   public Language lang;
+    
+  /**
+   * Controls whether a {@link SituationMention} <=> {@link Document.Constituent}
+   * bijection is maintained by the generated {@link ConcreteDocumentMapping}.
+   */
+  public boolean addSituationMentionConsIdxToMapping = true;
+  
+  public boolean setWordNocase = false;
+  public boolean setWordShape = false;
 
   public void clearTools() {
     lemmaTool = null;
@@ -198,6 +213,7 @@ public class ConcreteToDocument {
   /** Warning: This is an ad-hoc utility method, don't rely on this unless you're Travis */
   public void readConcreteStanford() {
     corefToolAuto = "Stanford Coref";
+//    corefMentionToolAuto = "Stanford Coref";
     cparseToolAuto = "Stanford CoreNLP";
     dparseBasicTool = STANFORD_DPARSE_BASIC;
     dparseColTool = STANFORD_DPARSE_COLL;
@@ -275,8 +291,10 @@ public class ConcreteToDocument {
     setTokenHelper(token::setNerH, alph::ner, nerH, tokenIdx, t);
 
     if (lang.isRoman()) {
-      token.setWordNocase(alph.word(w.toLowerCase()));
-      token.setShape(alph.shape(WordShape.wordShape(w)));
+      if (setWordNocase)
+        token.setWordNocase(alph.word(w.toLowerCase()));
+      if (setWordShape)
+        token.setShape(alph.shape(WordShape.wordShape(w)));
     }
 
     // WordNet synset id
@@ -297,6 +315,10 @@ public class ConcreteToDocument {
         }
       }
     }
+  }
+  
+  public static int addSituationMentions(List<SituationMention> mentions, int parentConstituent, Document doc, ConcreteDocumentMapping mapping) {
+    throw new RuntimeException("implement me");
   }
 
   /**
@@ -611,12 +633,13 @@ public class ConcreteToDocument {
    * or Document.NONE if there are predicates in the SRL labels
    * or Document.UNINITIALIZED if the {@link SituationMentionSet} cannot be found by the given tool name.
    */
-  public int addPropbankSrl(
+  public int addSituationMentionSetAsConstituents(
       Communication c,
       String situationMentionSetToolName,
       Map<ConstituentRef, Integer> constituentIndices,  // TODO fold into mapping
       ConcreteDocumentMapping mapping,
-      MultiAlphabet alph) {
+      MultiAlphabet alph,
+      boolean addSituationMentionConsIdxToMapping) {
 
     Document doc = mapping.getDocument();
 
@@ -643,7 +666,8 @@ public class ConcreteToDocument {
 
       // Make a situation node which is the parent of all the pred/args
       Constituent sit = doc.newConstituent();
-      sit.setLhs(alph.srl("propbank"));
+//      sit.setLhs(alph.srl("propbank"));
+      sit.setLhs(alph.srl(situationMentionSetToolName));
       sit.setLeftSib(prevSit);
       sit.setRightSib(Document.NONE); // will be over-written
       sit.setParent(Document.NONE);
@@ -654,6 +678,10 @@ public class ConcreteToDocument {
         assert first >= 0;
       }
       prevSit = sit.getIndex();
+      
+      if (addSituationMentionConsIdxToMapping) {
+        mapping.put(sit, sm.getUuid());
+      }
 
       // Set the predicate
       // first/last tokens + left/right children
@@ -741,6 +769,12 @@ public class ConcreteToDocument {
     doc.cons_paragraph = Document.NONE;
     for (Section s : c.getSectionList()) {
       int sectionLen = 0;
+      if (s == null || !s.isSetSentenceList()) {
+        Log.warn("(section==null)=" + (s==null)
+            + " (sentenceList==null)=" + (!s.isSetSentenceList())
+            + " skipping section " + s.getUuid() + " in " + c.getId());
+        continue;
+      }
       for (Sentence ss : s.getSentenceList()) {
         Tokenization tkz = ss.getTokenization();
         sectionLen += tkz.getTokenList().getTokenListSize();
@@ -796,6 +830,12 @@ public class ConcreteToDocument {
     int prevSent = Document.NONE;
     // Note that this info is already captured in the LHS of the sentence segmentation/cparse
     for (Section s : c.getSectionList()) {
+      if (s == null || !s.isSetSentenceList()) {
+        Log.warn("(section==null)=" + (s==null)
+            + " (sentenceList==null)=" + (!s.isSetSentenceList())
+            + " skipping section " + s.getUuid() + " in " + c.getId());
+        continue;
+      }
       for (Sentence ss : s.getSentenceList()) {
 
         Tokenization tkz = ss.getTokenization();
@@ -843,6 +883,12 @@ public class ConcreteToDocument {
     final int dParseRoot = numToks;
 
     for (Section s : c.getSectionList()) {
+      if (s == null || !s.isSetSentenceList()) {
+        Log.warn("(section==null)=" + (s==null)
+            + " (sentenceList==null)=" + (!s.isSetSentenceList())
+            + " skipping section " + s.getUuid() + " in " + c.getId());
+        continue;
+      }
       for (Sentence ss : s.getSentenceList()) {
         Tokenization tkz = ss.getTokenization();
 
@@ -955,50 +1001,82 @@ public class ConcreteToDocument {
     if (propbankToolGold != null) {
       if (debug_propbank)
         Log.info("adding propbankToolGold=" + propbankToolGold);
-      doc.cons_propbank_gold = addPropbankSrl(c, propbankToolGold, constituentIndices, mapping, alph);
+      doc.cons_propbank_gold = addSituationMentionSetAsConstituents(
+          c, propbankToolGold, constituentIndices, mapping, alph, addSituationMentionConsIdxToMapping);
       if (doc.cons_propbank_gold == Document.UNINITIALIZED)
         throw new RuntimeException("couldn't find gold propbank: " + propbankToolGold);
     }
     if (propbankToolAuto != null) {
       if (debug_propbank)
         Log.info("adding propbankToolAuto=" + propbankToolAuto);
-      doc.cons_propbank_auto = addPropbankSrl(c, propbankToolAuto, constituentIndices, mapping, alph);
+      doc.cons_propbank_auto = addSituationMentionSetAsConstituents(
+          c, propbankToolAuto, constituentIndices, mapping, alph, addSituationMentionConsIdxToMapping);
       if (doc.cons_propbank_auto == Document.UNINITIALIZED)
         throw new RuntimeException("couldn't find auto propbank: " + propbankToolAuto);
+    }
+    
+    // Add general-purpose SituationMentions
+    if (situationMentionToolGold != null) {
+      doc.cons_situationMentions_gold = addSituationMentionSetAsConstituents(
+          c, situationMentionToolGold, constituentIndices, mapping, alph, addSituationMentionConsIdxToMapping);
+      if (doc.cons_situationMentions_gold == Document.UNINITIALIZED)
+        throw new RuntimeException("couldn't find SituationMentions: " + propbankToolGold);
+    }
+    if (situationMentionToolAuto != null) {
+      doc.cons_situationMentions_auto = addSituationMentionSetAsConstituents(
+          c, situationMentionToolAuto, constituentIndices, mapping, alph, addSituationMentionConsIdxToMapping);
+      if (doc.cons_situationMentions_auto == Document.UNINITIALIZED)
+        throw new RuntimeException("couldn't find SituationMentions: " + propbankToolAuto);
     }
 
     // Add coref
     if (corefToolGold != null) {
       if (debug)
         Log.info("adding corefToolGold=" + corefToolGold);
-      EntitySet es = findByTool(c.getEntitySetList(), corefToolGold);
-      if (!es.isSetMentionSetId())
-        throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
-      EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
-      doc.cons_coref_gold = addCorefConstituents(es.getEntityList(), corefToolGold, ems, doc, mapping);
+      EntitySet es = findByTool(c.getEntitySetList(), corefToolGold, true);
+      if (es == null) {
+        Log.warn("couldn't find corefToolGold=" + corefToolGold + " in " + c.getId());
+      } else {
+        if (!es.isSetMentionSetId())
+          throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
+        EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
+        doc.cons_coref_gold = addCorefConstituents(es.getEntityList(), corefToolGold, ems, doc, mapping);
+      }
     }
     if (corefToolAuto != null) {
       if (debug)
         Log.info("adding corefToolAuto=" + corefToolAuto);
-      EntitySet es = findByTool(c.getEntitySetList(), corefToolAuto);
-      if (!es.isSetMentionSetId())
-        throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
-      EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
-      doc.cons_coref_auto = addCorefConstituents(es.getEntityList(), corefToolAuto, ems, doc, mapping);
+      EntitySet es = findByTool(c.getEntitySetList(), corefToolAuto, true);
+      if (es == null) {
+        Log.warn("couldn't find corefToolAuto=" + corefToolAuto + " in " + c.getId());
+      } else {
+        if (!es.isSetMentionSetId())
+          throw new RuntimeException("implement EntityMentionSet finder for when EntitySet doesn't provide one");
+        EntityMentionSet ems = findByUUID(c.getEntityMentionSetList(), es.getMentionSetId());
+        doc.cons_coref_auto = addCorefConstituents(es.getEntityList(), corefToolAuto, ems, doc, mapping);
+      }
     }
 
     // Add coref mentions
     if (corefMentionToolGold != null) {
       if (debug)
         Log.info("adding corefMentionToolGold=" + corefMentionToolGold);
-      EntityMentionSet ems = findByTool(c.getEntityMentionSetList(), corefMentionToolGold);
-      doc.cons_coref_mention_gold = addEntityMentions(ems.getMentionList(), Document.NONE, doc, mapping);
+      EntityMentionSet ems = findByTool(c.getEntityMentionSetList(), corefMentionToolGold, true);
+      if (ems == null) {
+        Log.warn("couldn't find corefMentionToolGold=" + corefMentionToolGold + " in " + c.getId());
+      } else {
+        doc.cons_coref_mention_gold = addEntityMentions(ems.getMentionList(), Document.NONE, doc, mapping);
+      }
     }
     if (corefMentionToolAuto != null) {
       if (debug)
         Log.info("adding corefMentionToolAuto=" + corefMentionToolAuto);
-      EntityMentionSet ems = findByTool(c.getEntityMentionSetList(), corefMentionToolAuto);
-      doc.cons_coref_mention_auto = addEntityMentions(ems.getMentionList(), Document.NONE, doc, mapping);
+      EntityMentionSet ems = findByTool(c.getEntityMentionSetList(), corefMentionToolAuto, true);
+      if (ems == null) {
+        Log.warn("couldn't find corefMentionToolAuto=" + corefMentionToolAuto + " in " + c.getId());
+      } else {
+        doc.cons_coref_mention_auto = addEntityMentions(ems.getMentionList(), Document.NONE, doc, mapping);
+      }
     }
 
     // Compute BrownClusters
@@ -1131,29 +1209,36 @@ public class ConcreteToDocument {
   }
 
   public static <T> T findByTool(List<T> items, String toolname) {
+    return findByTool(items, toolname, false);
+  }
+  public static <T> T findByTool(List<T> items, String toolname, boolean allowMissing) {
     T match = null;
     List<String> possible = new ArrayList<>();
-    for (T t : items) {
-      try {
-        Method m = t.getClass().getMethod("getMetadata");
-        AnnotationMetadata am = (AnnotationMetadata) m.invoke(t);
-        possible.add(am.getTool());
-        if (toolname.equals(am.getTool())) {
-          if (match != null) {
-            throw new RuntimeException("non-unique toolname \""
-                + toolname + "\" in " + possible
-                + " [" + items.get(0).getClass() + "]");
+    if (items != null) {
+      for (T t : items) {
+        try {
+          Method m = t.getClass().getMethod("getMetadata");
+          AnnotationMetadata am = (AnnotationMetadata) m.invoke(t);
+          possible.add(am.getTool());
+          if (toolname.equals(am.getTool())) {
+            if (match != null) {
+              throw new RuntimeException("non-unique toolname \""
+                  + toolname + "\" in " + possible
+                  + " [" + items.get(0).getClass() + "]");
+            }
+            match = t;
           }
-          match = t;
+        } catch (Exception e) {
+          throw new RuntimeException(e);
         }
-      } catch (Exception e) {
-        throw new RuntimeException(e);
       }
     }
-    if (match == null) {
+    if (match == null && !allowMissing) {
+      String c = "???";
+      if (items != null)
+        c = items.get(0).getClass().getName();
       throw new RuntimeException("couldn't find tool named \""
-          + toolname + "\" in " + possible
-          + " [" + items.get(0).getClass() + "]");
+          + toolname + "\" in " + possible + " [" + c + "]");
     }
     return match;
   }

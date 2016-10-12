@@ -36,6 +36,9 @@ public class ConcreteDocumentMapping implements Serializable {
 
   // There are many items that are indexed by UUIDs in Concrete and Constituents
   // in tutils.Document, e.g. EntityMention, Entity, Tokenization, Section, etc
+  // NOTE: Currently this stores:
+  //   cons_sentence <=> Tokenization.uuid
+  // You can add more bijections with the methods below.
   private IntObjectHashMap<UUID> c2u;
   private Map<UUID, Integer> u2c;
 

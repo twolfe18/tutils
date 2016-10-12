@@ -125,10 +125,14 @@ public final class Document implements Serializable {
   public int cons_ptb_gold = NONE;    // e.g. CoNLL/PTB gold parse
   public int cons_ptb_auto = NONE;    // e.g. Stanford cparse
 
-  // top level is linked list of items like (PROP ... (ARG ...) (ARG ...) ...)
+  // top level is linked list of items like (SituationMention ... (Target/predicate lhs=frameType ...) (Argument lhs=roleType ...)*)
   // See above for note about handling Propbank continuation roles, etc.
   public int cons_propbank_gold = NONE;
   public int cons_propbank_auto = NONE;
+  
+  // Same format as cons_propbank_*, but this holds some arbitrary SituationMention-shaped annotations
+  public int cons_situationMentions_gold = NONE;
+  public int cons_situationMentions_auto = NONE;
 
   // top level is linked list of (NER lhs=type firstToken=i lastToken=j)
   public int cons_ner_gold = NONE;

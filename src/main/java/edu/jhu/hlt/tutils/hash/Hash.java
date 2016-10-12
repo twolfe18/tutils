@@ -31,6 +31,13 @@ public class Hash {
     h += (h << 15);
     return h;
   }
+  
+  /**
+   * Return z = x * Y + y. Useful for retrieving x = z / Y and y = z % Y.
+   */
+  public static int interleave(int y, int Y, int x) {
+    return x * Y + y;
+  }
 
   /**
    * Adapted from Jenkins hash:

@@ -60,9 +60,16 @@ public class LabeledDirectedGraph implements Serializable {
   // 1 indicates conode->node (conode is parent) and 0 indicates node->conode (conode is child)
   private long[] edges;
 
-  // Index is a token index, value is the first index in edges s.t. the edge
+  // Index is a token (node) index, value is the first index in edges s.t. the edge
   // label direction is node -> conode.
   private int[] splitPoints;
+  
+  // Just have two booleans?
+  enum Mode {
+    INCOMING_AND_OUTGOING,  // edges = [..., parent(n, j), parent(n, j-1), ... parent(n, 0), 
+    INCOMING,
+    OUTGOING,
+  }
 
   /*
    * TODO This should degrade nicely in the case of a tree.
@@ -162,6 +169,18 @@ public class LabeledDirectedGraph implements Serializable {
       this.numParents = -1;
       this.numChildren = -1;
     }
+    
+    public int computeDepthAssumingTree() {
+      int hops = 0;
+      Node cur = this;
+      while (true) {
+        if (cur.numParents() == 0)
+          return hops;
+        if (cur.numParents() > 1)
+          throw new RuntimeException("not a tree");
+        cur = cur.getParentNode(0);
+      }
+    }
 
     public int getNodeIndex() {
       return node;
@@ -189,7 +208,7 @@ public class LabeledDirectedGraph implements Serializable {
     }
 
     public long getParentEdge(int i) {
-      assert i >= 0 && i < numParents();
+      assert i >= 0 && i < numParents() : "i=" + i;
       return edges[split - (i + 1)];
     }
 
@@ -243,6 +262,14 @@ public class LabeledDirectedGraph implements Serializable {
       assert i >= 0 && i < numChildren();
       return edges[split + i];
     }
+
+    public int getChildEdgeLabel(int i) {
+      if (numParents() == 0)
+        return Document.UNINITIALIZED;
+      long e = getChildEdge(i);
+      return unpackEdge(e);
+    }
+
 
     public int getChild(int i) {
       long e = getChildEdge(i);

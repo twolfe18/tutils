@@ -9,6 +9,14 @@ public class ConllxToDocument {
   private MultiAlphabet alph;
   public boolean showReads = false;
   
+  /**
+   * Read dependency parse tree in as a "constituency" parse where
+   * first and last tokens are both the token/node index.
+   * Lhs encodes the edge label (use {@link MultiAlphabet#dep(int)}).
+   * The parent/sibling/children fields encode the tree.
+   */
+  public boolean readDepsAsConsTree = false;
+  
   public ConllxToDocument(MultiAlphabet alph) {
     this.alph = alph;
   }
@@ -48,6 +56,8 @@ public class ConllxToDocument {
   public Document parse(String id, File conllxFile) throws IOException {
     if (showReads)
       Log.info("reading docId=" + id + " conllxFile=" + conllxFile.getPath());
+    if (readDepsAsConsTree)
+      throw new RuntimeException("implement me");
     Document d = new Document(id, -1, alph);
     LabeledDirectedGraph.Builder g = new LabeledDirectedGraph().new Builder();
     try (BufferedReader r = FileUtil.getReader(conllxFile)) {
