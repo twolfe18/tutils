@@ -1,9 +1,17 @@
 package edu.jhu.hlt.tutils;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
+import java.io.File;
+import java.io.InputStream;
+
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.apache.thrift.transport.TIOStreamTransport;
 import org.junit.Before;
 import org.junit.Test;
+
+import edu.jhu.hlt.concrete.Communication;
+import edu.jhu.hlt.tutils.ling.Language;
 
 public class LabeledDirectedGraphTests {
 
@@ -43,5 +51,31 @@ public class LabeledDirectedGraphTests {
       assertEquals(edge, LabeledDirectedGraph.unpackEdge(c.getParentEdge(0)));
     }
 
+  }
+  
+  @Test
+  public void concreteInteropTest0() throws Exception {
+
+    long start = System.currentTimeMillis();
+
+    File p = new File("/home/travis/code/fnparse/");
+    File f = new File(p, "data/parma/ecbplus/ECB+_LREC2014/concrete-parsey-and-stanford/12_9ecbplus.comm");
+    Communication comm = new Communication();
+    try (InputStream b = FileUtil.getInputStream(f)) {
+      comm.read(new TCompactProtocol(new TIOStreamTransport(b)));
+    }
+    long a = System.currentTimeMillis();
+
+    ConcreteToDocument c2d = new ConcreteToDocument(null, null, null, Language.EN);
+    c2d.readParsey();
+    ConcreteDocumentMapping cdm = c2d.communication2Document(comm, -1, new MultiAlphabet(), c2d.lang);
+    Document d = cdm.getDocument();
+    long b = System.currentTimeMillis();
+    
+    System.out.println(d.parseyMcParseFace.toString(d.getAlphabet()));
+    long c = System.currentTimeMillis();
+    System.out.println(a - start);
+    System.out.println(b - a);
+    System.out.println(c - b);
   }
 }
