@@ -5,7 +5,58 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-public class ReservoirSample {
+public class ReservoirSample<T> implements Iterable<T> {
+  
+  private Random rand;
+  private List<T> reservoir;
+  private int k;  // max res size
+  private int n;  // number of observations
+  
+  public ReservoirSample(int k, Random rand) {
+    this.rand = rand;
+    this.reservoir = new ArrayList<>(k);
+    this.k = k;
+    this.n = 0;
+  }
+  
+  public boolean add(T item) {
+    n++;
+    if (reservoir.size() < k) {
+      reservoir.add(item);
+      return true;
+    }
+    int i = rand.nextInt(n);
+    if (i < k) {
+      reservoir.set(i, item);
+      return true;
+    }
+    return false;
+  }
+  
+  public T get(int i) {
+    return reservoir.get(i);
+  }
+  
+  public int size() {
+    return reservoir.size();
+  }
+  
+  public int capactity() {
+    return k;
+  }
+  
+  public int numObservations() {
+    return n;
+  }
+  
+  public Random getRandom() {
+    return rand;
+  }
+
+  @Override
+  public Iterator<T> iterator() {
+    return reservoir.iterator();
+  }
 
   /**
    * NOTE: If you're not using an iterator, you're probably not getting the full
