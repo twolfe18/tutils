@@ -2,9 +2,7 @@ package edu.jhu.hlt.tutils.ling;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
 
@@ -14,23 +12,15 @@ import edu.jhu.hlt.tutils.ConcreteToDocument;
 import edu.jhu.hlt.tutils.Document;
 import edu.jhu.hlt.tutils.Document.ConstituentItr;
 import edu.jhu.hlt.tutils.LabeledDirectedGraph;
-import edu.jhu.hlt.tutils.LabeledDirectedGraph.Node;
-import edu.jhu.hlt.tutils.Log;
 import edu.jhu.hlt.tutils.MultiAlphabet;
 
 /**
- * Finds the head of a by choosing the word with a single external head.
+ * Finds the head of a by choosing the token closest to root,
+ * breaking ties by preferring nodes to the right.
  */
 public class DParseHeadFinder implements HeadFinder {
 
-  public static boolean IGNORE_HEAD_TIES = false;
-  public static boolean IGNORE_NO_EXT_HEAD = false;
-
   public Function<Document, LabeledDirectedGraph> parse = d -> d.stanfordDepsBasic;
-
-  public boolean returnHeadAtAnyCost = true;
-
-  public boolean debug = false;
 
   /** Returns the parse that this head finder uses */
   public LabeledDirectedGraph getParse(Document d) {
@@ -42,57 +32,20 @@ public class DParseHeadFinder implements HeadFinder {
     return this;
   }
 
+  @Override
   public int head(Document doc, int first, int last) {
+    assert first <= last;
     LabeledDirectedGraph graph = parse.apply(doc);
-    int extHead = -1;
-    List<Integer> possible = null;
-    for (int i = first; i <= last; i++) {
-      if (debug) System.out.println("i=" + i);
-      Node n = graph.getNode(i);
-      if (parentIsOutsideSpan(n, first, last)) {
-        if (debug) System.out.println("external head: " + i);
-        // TODO prefer verbs over nouns?
-        if (extHead != -1) {
-          //throw new RuntimeException(">1 external head");
-          if (possible == null) {
-            possible = new ArrayList<>();
-            possible.add(extHead);
-          }
-          possible.add(i);
-        }
-        extHead = i;
+    int shallowest = last;
+    int depth = graph.getNode(last).computeDepthAssumingTree();
+    for (int i = first; i < last; i++) {
+      int d = graph.getNode(i).computeDepthAssumingTree();
+      if (d < depth) {
+        shallowest = i;
+        depth = d;
       }
     }
-    if (extHead == -1 && !IGNORE_NO_EXT_HEAD) {
-      Log.warn("no external head");
-      if (returnHeadAtAnyCost)
-        return last;
-    }
-    if (possible != null) {
-      if (!IGNORE_HEAD_TIES)
-        Log.warn("multiple heads, breaking ties");
-      return headTieBreak(doc, possible);
-    }
-    return extHead;
-  }
-
-  public int headTieBreak(Document doc, List<Integer> possibleHeads) {
-    // TODO
-    return possibleHeads.get(0);
-  }
-
-  public boolean parentIsOutsideSpan(Node node, int first, int last) {
-    if (first > last)
-      throw new IllegalArgumentException();
-    int np = node.numParents();
-    if (np == 0)
-      return false;
-    for (int i = 0; i < np; i++) {
-      int p = node.getParentNode(i).getNodeIndex();
-      if (p < first || p > last)
-        return true;
-    }
-    return false;
+    return shallowest;
   }
 
   public static void main(String[] args) throws Exception {
