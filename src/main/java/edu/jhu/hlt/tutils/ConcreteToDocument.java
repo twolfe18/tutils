@@ -89,6 +89,11 @@ public class ConcreteToDocument {
         && p.getMetadata().getTool().toLowerCase().contains("col")
         && !STANFORD_DPARSE_COLL_CC.test(p);
   };
+  public static final Predicate<DependencyParse> PARSEY_DPARSE = p -> {
+    String t = p.getMetadata().getTool().toLowerCase();
+//    return t.contains("parsey") || t.contains("pmp") || t.contains("syntaxnet");
+    return t.equals("parsey");
+  };
   public static final Predicate<EntitySet> STANFORD_COREF = es -> {
     return IS_STANFORD.test(es.getMetadata());
   };
@@ -120,10 +125,11 @@ public class ConcreteToDocument {
   public String cparseToolGold;
   public String cparseToolAuto;
 
-  public Predicate<DependencyParse> dparseBasicTool;   // stanfordDepsBasic
-  public Predicate<DependencyParse> dparseColTool;     // stanfordDepsCollapsed
-  public Predicate<DependencyParse> dparseColCCTool;   // stanfordDepsCollapsedCC
-  public Predicate<DependencyParse> dparseUDTool;      // universalDependencies
+  public Predicate<DependencyParse> dparseBasicTool;  // stanfordDepsBasic
+  public Predicate<DependencyParse> dparseColTool;    // stanfordDepsCollapsed
+  public Predicate<DependencyParse> dparseColCCTool;  // stanfordDepsCollapsedCC
+  public Predicate<DependencyParse> dparseUDTool;     // universalDependencies
+  public Predicate<DependencyParse> dparseParsey;     // Parsey McParseface, syntaxnet, Andor et al. (2016)
 
   /**
    * Assumes Propbank SRL is stored as a {@link SituationMention} using
@@ -187,6 +193,7 @@ public class ConcreteToDocument {
     dparseColTool = null;
     dparseColCCTool = null;
     dparseUDTool = null;
+    dparseParsey = null;
     propbankToolGold = null;
     propbankToolAuto = null;
     corefToolGold = null;
@@ -221,6 +228,10 @@ public class ConcreteToDocument {
     posToolAuto = STANFORD_POS;
     nerToolAuto = STANFORD_NER;
     lemmaTool = STANFORD_LEMMA;
+  }
+  
+  public void readParsey() {
+    dparseParsey = PARSEY_DPARSE;
   }
 
   public void readTacKbp2015SituationsAsSrl() {
@@ -877,10 +888,13 @@ public class ConcreteToDocument {
     LabeledDirectedGraph.Builder dparseColl = new LabeledDirectedGraph().new Builder();
     LabeledDirectedGraph.Builder dparseCollCC = new LabeledDirectedGraph().new Builder();
     LabeledDirectedGraph.Builder dparseUD = new LabeledDirectedGraph().new Builder();
+    LabeledDirectedGraph.Builder dparseParsey = new LabeledDirectedGraph().new Builder();
 
-    // We use numToks (in the entire document) as the root for all dparses
-    assert numToks > 0;
-    final int dParseRoot = numToks;
+//    // We use numToks (in the entire document) as the root for all dparses
+//    assert numToks > 0;
+//    final int dParseRoot = numToks;
+    // DO NOT add a pseudo-root.
+    final int dParseRoot = -1;
 
     for (Section s : c.getSectionList()) {
       if (s == null || !s.isSetSentenceList()) {
@@ -921,7 +935,7 @@ public class ConcreteToDocument {
         if (nerToolGold != null)
           nerG = findByPredicate(tkz.getTokenTaggingList(), nerToolGold);
         TokenTagging nerH = null;
-        if (nerToolGold != null)
+        if (nerToolAuto != null)
           nerH = findByPredicate(tkz.getTokenTaggingList(), nerToolAuto);
 
         TokenTagging lemma = null;
@@ -979,6 +993,9 @@ public class ConcreteToDocument {
         dparseUD.addFromConcrete(
             findByPredicate(tkz.getDependencyParseList(), this.dparseUDTool),
             tokenOffset, n, dParseRoot, alph);
+        dparseParsey.addFromConcrete(
+            findByPredicate(tkz.getDependencyParseList(), this.dparseParsey),
+            tokenOffset, n, dParseRoot, alph);
 
         tokenOffset += n;
       }
@@ -992,6 +1009,8 @@ public class ConcreteToDocument {
       doc.stanfordDepsCollapsedCC = dparseCollCC.freeze();
     if (dparseUD.numEdges() > 0)
       doc.universalDependencies = dparseUD.freeze();
+    if (dparseParsey.numEdges() > 0)
+      doc.parseyMcParseFace = dparseParsey.freeze();
 
     doc.computeDepths();
 

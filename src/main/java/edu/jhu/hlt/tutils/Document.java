@@ -184,6 +184,9 @@ public final class Document implements Serializable {
   }
 
   /* GRAPHS *******************************************************************/
+  
+  // These graphs all have nodes which correspond to token indices (0-indexed).
+  // There are no edges connecting to a ROOT node.
 
   // See http://nlp.stanford.edu/software/dependencies_manual.pdf
   public LabeledDirectedGraph stanfordDepsBasic;
