@@ -170,6 +170,14 @@ public class LabeledDirectedGraph implements Serializable {
       this.numChildren = -1;
     }
     
+    public boolean isRoot() {
+      return numParents() == 0;
+    }
+    
+    public boolean isLeaf() {
+      return numChildren() == 0;
+    }
+    
     public int computeDepthAssumingTree() {
       int hops = 0;
       Node cur = this;
@@ -264,7 +272,7 @@ public class LabeledDirectedGraph implements Serializable {
     }
 
     public int getChildEdgeLabel(int i) {
-      if (numParents() == 0)
+      if (numChildren() == 0)
         return Document.UNINITIALIZED;
       long e = getChildEdge(i);
       return unpackEdge(e);
@@ -343,33 +351,38 @@ public class LabeledDirectedGraph implements Serializable {
     }
 
     /**
-     * Uses 0-indexes for tokens with n as root/wall (where n is the length of the
-     * sentence).
+     * Uses 0-indexes for tokens.
+     *
      * @param n is the length of the sentence/tokenization. Since a dependency
      * parse need not (necessarily) cover all the tokens, this is required.
-     * @param root must be &ge; n (and thus &ge; 0), and is the number used to denote
-     * the root node. Should be greater than any other valid node index.
+     *
+     * @param root will serve as the root node of the tree if it is &ge; n (and thus &ge; 0).
+     * If a non-positive value is given, then no root node is added (and no edges to root either).
+     * Otherwise edges with no gov token are dropped.
+     * If root &gt 0, it should be greater than any other valid node index.
+     *
      * @param offset is the 0-index of the first token in the {@link DependencyParse}
      * (concrete uses sentence-specific indexes, this uses document/global indices).
      */
     public void addFromConcrete(DependencyParse p, int offset, int n, int root, MultiAlphabet alph) {
       if (p == null)
         return;
-      if (root < 0)
-        throw new IllegalArgumentException();
-      assert n <= root;
+      assert n > 0;
+      assert offset >= 0;
       for (Dependency d : p.getDependencyList()) {
         int e = alph.dep(d.getEdgeType());
-        int gov = root;
+        int gov;
         if (d.isSetGov() && d.getGov() >= 0) {
           gov = d.getGov() + offset;
-          assert gov < root;
+          assert root <= 0 || gov < root;
           assert d.getGov() < n;
-        } else {
+        } else if (root > 0) {
           gov = root;
+        } else {
+          continue;
         }
         int dep = d.getDep() + offset;
-        assert dep < root;
+        assert root <= 0 || dep < root;
         assert d.getDep() < n;
         assert gov >= 0 && dep >= 0;
 //        System.out.println("gov=" + gov + " dep=" + dep + " offset=" + offset
@@ -377,6 +390,10 @@ public class LabeledDirectedGraph implements Serializable {
 //            + " gov+offset=" + (gov+offset) + " dep+offset=" + (dep+offset));
         add(gov, dep, e);
       }
+    }
+
+    public void addFromConcrete(DependencyParse p, int offset, int n, MultiAlphabet alph) {
+      addFromConcrete(p, offset, n, -1, alph);
     }
   }
 
