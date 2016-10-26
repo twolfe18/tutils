@@ -82,8 +82,29 @@ public class MultiTimer {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    for(Map.Entry<String, Timer> x : timers.entrySet())
-      sb.append(x.getKey() + ": " + x.getValue() + "\n");
+    
+    // Sort by time take, longest first
+    List<String> keys = new ArrayList<>(timers.keySet());
+    Collections.sort(keys, new Comparator<String>() {
+      @Override
+      public int compare(String o1, String o2) {
+        long a = timers.get(o1).totalTimeInMilliseconds();
+        long b = timers.get(o2).totalTimeInMilliseconds();
+        if (a > b)
+          return -1;
+        if (a < b)
+          return +1;
+        return 0;
+      }
+    });
+    
+    for (String k : keys) {
+      Timer t = timers.get(k);
+      sb.append(String.format("%-20s %s\n", k, t));
+    }
+//    for(Map.Entry<String, Timer> x : timers.entrySet())
+//      sb.append(x.getKey() + ": " + x.getValue() + "\n");
+
     long total = System.currentTimeMillis() - firstStart;
     sb.append("total: " + (total/1000d));
     return sb.toString();

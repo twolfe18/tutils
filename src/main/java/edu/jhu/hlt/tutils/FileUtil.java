@@ -43,6 +43,18 @@ public class FileUtil {
     }
   }
   
+  public static String getContents(File f, boolean replaceNewlinesWithSpaces) {
+    StringBuilder sb = new StringBuilder();
+    for (String line : getLines(f)) {
+      if (replaceNewlinesWithSpaces && sb.length() > 0)
+        sb.append(' ');
+      sb.append(line);
+      if (!replaceNewlinesWithSpaces)
+        sb.append('\n');
+    }
+    return sb.toString();
+  }
+  
   public static void rm_rf(File f) {
     Path directory = f.toPath();
     try {
