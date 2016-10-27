@@ -34,8 +34,12 @@ public class DParseHeadFinder implements HeadFinder {
 
   @Override
   public int head(Document doc, int first, int last) {
-    assert first <= last;
     LabeledDirectedGraph graph = parse.apply(doc);
+    return head(graph, first, last);
+  }
+
+  public int head(LabeledDirectedGraph graph, int first, int last) {
+    assert first <= last;
     int shallowest = last;
     int depth = graph.getNode(last).computeDepthAssumingTree();
     for (int i = first; i < last; i++) {
