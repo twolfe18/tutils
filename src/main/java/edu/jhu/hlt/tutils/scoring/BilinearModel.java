@@ -1,5 +1,9 @@
 package edu.jhu.hlt.tutils.scoring;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -7,9 +11,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import com.fasterxml.jackson.databind.deser.DataFormatReaders;
-
+import edu.jhu.hlt.tutils.FileUtil;
 import edu.jhu.hlt.tutils.IntPair;
+import edu.jhu.hlt.tutils.features.indexing.FNode;
+import edu.jhu.hlt.tutils.features.indexing.FNode.AssignIndices;
 import edu.jhu.prim.Primitives.MutableDouble;
 
 /**
@@ -54,12 +59,61 @@ import edu.jhu.prim.Primitives.MutableDouble;
  * TODO Consider how to do this with Mahalanobis distance instead of dot-product similarity.
  * https://en.wikipedia.org/wiki/Mahalanobis_distance
  */
-public class BilinearModel {
-  
+public class BilinearModel implements Serializable {
+  private static final long serialVersionUID = 8132666541670564195L;
+
   public enum Mode {
     MATRIX,
     VECTOR,
     SCALAR,
+  }
+  
+  interface FeatureEmb {
+    int getType();
+    int getFeatureDomain();
+//    double[] getEmbedding(int feature);
+    ProjFeatsI getEmbedding(int feature);
+  }
+
+  // TODO Have implementation which uses an actual double[][]
+  static class RandomProjFeatureEmb implements FeatureEmb {
+    // TODO Have salt and set the seed to Hash.mix(feature, salt)
+    int type;
+    int numFeatures;
+    int dim;
+    Random rand;
+    public RandomProjFeatureEmb(int type, int domain, int dimension) {
+      this.type = type;
+      this.numFeatures = domain;
+      this.dim = dimension;
+      this.rand = new Random(9001);
+    }
+    @Override
+    public int getType() {
+      return type;
+    }
+    @Override
+    public int getFeatureDomain() {
+      return numFeatures;
+    }
+    @Override
+    public ProjFeatsI getEmbedding(int feature) {
+      double[] emb = new double[dim];
+      rand.setSeed(feature);
+      double ss = 0;
+      for (int i = 0; i < dim; i++) {
+        emb[i] = rand.nextGaussian();
+        ss += emb[i] * emb[i];
+      }
+      // Normalize to have L2=1
+      for (int i = 0; i < dim; i++)
+        emb[i] /= ss;
+//      return emb;
+      return new ProjFeatsI() {
+        @Override public double[] forwards() { return emb; }
+        @Override public void backwards(double[] dErr_dForwards) { /* no-op */ }
+      };
+    }
   }
   
   // Projection features
@@ -67,10 +121,12 @@ public class BilinearModel {
   // the same feature type in two places,
   // e.g. a ProjFeats for {type=headword, value="John"} and one for {type=headword, value="Mary"}
   private double[][][] type2feat2dim2param;
+  private Map<Integer, FeatureEmb> type2featEmb;
   private Map<IntPair, Object> thetaParams;     // values are double[][], double[], or MutableDouble
   
   public BilinearModel(int numTypes) {
     type2feat2dim2param = new double[numTypes][][];
+    type2featEmb = new HashMap<>();
     thetaParams = new HashMap<>();
   }
   
@@ -104,6 +160,8 @@ public class BilinearModel {
   }
   
   /**
+   * Creates a feature embedding layer for this type.
+   *
    * @param type
    * @param domain is how many features belong to this type
    * @param dimension is how big the embedding should be
@@ -115,6 +173,12 @@ public class BilinearModel {
     }
     assert type2feat2dim2param[type] == null;
     type2feat2dim2param[type] = new double[domain][dimension];
+  }
+  
+  public void addFeatureType(FeatureEmb embForFeaturesInOneType) {
+    int t = embForFeaturesInOneType.getType();
+    Object old = type2featEmb.put(t, embForFeaturesInOneType);
+    assert old == null;
   }
   
   public void addInteraction(int leftType, int rightType, Mode mode) {
@@ -209,12 +273,17 @@ public class BilinearModel {
       } else {
         throw new RuntimeException("unknown param type: " + params);
       }
-      t.setFeatures(l, r);
-      a.add(t);
+//      t.setFeatures(l, r);
+//      a.add(t);
+      throw new RuntimeException("fixme");
     }
     return new Adjoints.Sum(a);
   }
 
+  interface ProjFeatsI {
+    double[] forwards();  // compute this once and cache it! calls to backwards interleaved with forwards should not change this!
+    void backwards(double[] dErr_dForwards);
+  }
   
   /**
    * Represents parameters and features (similar to Adjoints, but with a
@@ -306,14 +375,9 @@ public class BilinearModel {
     int leftType, rightType;
     
     // Features, use setter, not permanently housed here
-    protected ProjFeats left, right;
-    
-    // NOTE: This class cannot own these vectors
-    // Only one of these can be non-null
-    // If this is non-null, then required(dim(left) == dim(right))
-    double[] theta1;
-    // Also required(dim(left) == dim(right)), as if theta2 := theta0 * I
-    MutableDouble theta0;
+//    protected ProjFeats left, right;
+    protected ProjFeatsI left, right;   // for backwards
+    protected double[] leftForwards, rightForwards;
 
     boolean learnTheta;
     
@@ -323,11 +387,12 @@ public class BilinearModel {
       this.learnTheta = learnTheta;
     }
 
-    public void setFeatures(ProjFeats left, ProjFeats right) {
-      if (left.type != leftType)
-        throw new IllegalArgumentException();
-      if (right.type != rightType)
-        throw new IllegalArgumentException();
+    public void setFeatures(ProjFeatsI left, ProjFeatsI right) {
+      // TODO
+//      if (left.type != leftType)
+//        throw new IllegalArgumentException();
+//      if (right.type != rightType)
+//        throw new IllegalArgumentException();
       this.left = left;
       this.right = right;
     }
@@ -354,9 +419,11 @@ public class BilinearModel {
      * Call setFeatures first.
      */
     public double forwards() {
-      boolean allowCompute = true;
-      double[] left = this.left.readAx(allowCompute);
-      double[] right = this.right.readAx(allowCompute);
+//      boolean allowCompute = true;
+//      double[] left = this.left.readAx(allowCompute);
+//      double[] right = this.right.readAx(allowCompute);
+      double[] left = this.left.forwards();
+      double[] right = this.right.forwards();
       double s = 0;
       assert theta2.length == left.length;
       assert theta2[0].length == right.length;
@@ -367,9 +434,11 @@ public class BilinearModel {
     }
     
     public void backwards(double dErr_dForwards) {
-      boolean allowCompute = false;
-      double[] left = this.left.readAx(allowCompute);
-      double[] right = this.right.readAx(allowCompute);
+//      boolean allowCompute = false;
+//      double[] left = this.left.readAx(allowCompute);
+//      double[] right = this.right.readAx(allowCompute);
+      double[] left = this.left.forwards();
+      double[] right = this.right.forwards();
       
       // To compute gradient w.r.t. left and right
       double[] gLeft = new double[left.length];
@@ -420,8 +489,8 @@ public class BilinearModel {
      */
     public double forwards() {
       boolean allowCompute = true;
-      double[] left = this.left.readAx(allowCompute);
-      double[] right = this.right.readAx(allowCompute);
+      double[] left = this.left.forwards();
+      double[] right = this.right.forwards();
       double s = 0;
       assert left.length == right.length;
       assert left.length == theta1.length;
@@ -432,8 +501,8 @@ public class BilinearModel {
     
     public void backwards(double dErr_dForwards) {
       boolean allowCompute = false;
-      double[] left = this.left.readAx(allowCompute);
-      double[] right = this.right.readAx(allowCompute);
+      double[] left = this.left.forwards();
+      double[] right = this.right.forwards();
       
       // To compute gradient w.r.t. left and right
       double[] gLeft = new double[left.length];
@@ -505,9 +574,8 @@ public class BilinearModel {
      * Call setFeatures first.
      */
     public double forwards() {
-      boolean allowCompute = true;
-      double[] left = this.left.readAx(allowCompute);
-      double[] right = this.right.readAx(allowCompute);
+      double[] left = this.left.forwards();
+      double[] right = this.right.forwards();
       double s = 0;
       assert left.length == right.length;
       for (int i = 0; i < left.length; i++)
@@ -517,9 +585,8 @@ public class BilinearModel {
     }
 
     public void backwards(double dErr_dForwards) {
-      boolean allowCompute = false;
-      double[] left = this.left.readAx(allowCompute);
-      double[] right = this.right.readAx(allowCompute);
+      double[] left = this.left.forwards();
+      double[] right = this.right.forwards();
       
       // To compute gradient w.r.t. left and right
       double[] gLeft = new double[left.length];
@@ -544,5 +611,130 @@ public class BilinearModel {
       this.right.backwards(gRight);
     }
   }
+  
+  
+  public static class Inst {
+    String line;
+    double y;
+    List<IntPair> left, right;
+  }
+  
+  public static class Trainer {
+    private String leftKey, rightKey;
+    private FNode<String> features;
+    
+    public Trainer(String leftKey, String rightKey) {
+      this.leftKey = leftKey;
+      this.rightKey = rightKey;
+      this.features = new FNode<>(null);
+    }
+    
+    public List<Inst> extract(File f) throws IOException {
+      List<Inst> l = new ArrayList<>();
+      try (BufferedReader r = FileUtil.getReader(f)) {
+        for (String line = r.readLine(); line != null; line = r.readLine())
+          l.add(extract(line));
+      }
+      return l;
+    }
 
+    public Inst extract(String line) {
+      String[] tokens = line.split(" ");
+      double y = Double.parseDouble(tokens[0]);
+      List<IntPair> left = new ArrayList<>();
+      List<IntPair> right = new ArrayList<>();
+      for (int i = 1; i < tokens.length; i++) {
+        String t = tokens[i];
+        int c = t.indexOf(':');
+        String[] vals = t.substring(c+1).split("/");
+        String key = t.substring(0, c);
+        if (key.equals(leftKey)) {
+          features.extract(0, vals, left);
+        } else if (key.equals(rightKey)) {
+          features.extract(0, vals, right);
+        } else {
+          System.out.println("skipping: " + key + " " + Arrays.toString(vals));
+        }
+      }
+      Inst i = new Inst();
+      i.line = line;
+      i.y = y;
+      i.left = left;
+      i.right = right;
+      return i;
+    }
+    
+    public void add(String line) {
+      String[] tokens = line.split(" ");
+      for (int i = 1; i < tokens.length; i++) {
+        int c = tokens[i].indexOf(':');
+        String[] vals = tokens[i].substring(c+1).split("/");
+        String key = tokens[i].substring(0, c);
+        add(key, vals);
+      }
+    }
+
+    public void add(String key, String[] vals) {
+      if (key.equals(leftKey)) {
+        features.add(0, vals);
+      } else if (key.equals(rightKey)) {
+        features.add(0, vals);
+      } else {
+        System.out.println("skipping: " + key + " " + Arrays.toString(vals));
+      }
+    }
+    
+    public void build(File f) throws IOException {
+      try (BufferedReader r = FileUtil.getReader(f)) {
+        for (String line = r.readLine(); line != null; line = r.readLine())
+          add(line);
+      }
+
+      // Three ways to prune the feature space
+      // TODO: No way to merge values,
+      // e.g. say n is the last type allowed by maxTypes,
+      //  and say all n's children have counts > minObs,
+      //  and n even has some grand-children which satisfy minObs...
+      //  would be nice to consider the two edges (toChild, toGrandchild) as one node which receives its own feature.
+      // This would break local index through! localFeat might be w.r.t. parent.globalType or grandParent.globalType!
+      // We could have a localFeatureParent and localFeatureGrandparent, but we would need to ensure that only one of
+      // them is valid/assigned for each node.
+      // THATS NOT true, they can both be assigned (we still want backoff features), but if localFeatureGrandparent
+      // is assigned, its parent must not have globalType set.
+      int minObs = 5;
+      int maxTypes = 100;
+      int maxFeats = 1 << 20;
+
+      AssignIndices<String> ai = new AssignIndices<>(features);
+//      ai.verbose = true;
+      ai.run(minObs, maxTypes, maxFeats);
+    }
+  }
+
+  /*
+   * read in lines like
+   * <label> q:stringFeat/foo r:stringFeat/bar
+   * 
+   * build an alphabet which has lines like:
+   * stringFeat/foo/bar <typeGlobal>:int <featLocal>:int
+   * 
+   * and output a file like the input with
+   * 1) some pruning (e.g. features which didn't appear 5 times)
+   * 2) strings replaced with ints
+   */
+
+  public static void main(String[] args) throws Exception {
+    File f = new File("/tmp/responses.txt");
+    Trainer t = new Trainer("q", "r");
+    t.build(f);
+    int c = 0;
+    for (Inst i : t.extract(f)) {
+      System.out.println(i.y);
+      System.out.println(i.left);
+      System.out.println(i.right);
+      System.out.println();
+      if (++c > 10)
+        break;
+    }
+  }
 }
