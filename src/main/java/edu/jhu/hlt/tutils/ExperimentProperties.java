@@ -326,8 +326,10 @@ public class ExperimentProperties extends java.util.Properties {
     String parentGlob = getString(key);
 
     int i = parentGlob.indexOf("**");
-    if (i < 0)
-      throw new RuntimeException("glob must contain **");
+    if (i < 0) {
+//      throw new RuntimeException("glob must contain **");
+      return Arrays.asList(new File(parentGlob));
+    }
     File parent = new File(parentGlob.substring(0, i));
     String glob = "glob:" + parentGlob.substring(i);
     if (!parent.exists())
