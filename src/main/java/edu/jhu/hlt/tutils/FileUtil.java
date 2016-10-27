@@ -178,7 +178,7 @@ public class FileUtil {
       throw new RuntimeException(e);
     }
     double sec = (System.currentTimeMillis() - s) / 1000d;
-    Log.info(String.format("too %.2f sec to read from %s", sec, f.getPath()));
+    Log.info(String.format("took %.2f sec to read from %s", sec, f.getPath()));
     return out;
   }
 
