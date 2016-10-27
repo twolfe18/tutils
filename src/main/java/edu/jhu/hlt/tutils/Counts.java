@@ -81,8 +81,16 @@ public class Counts<T> implements Serializable {
     }
   }
 
-  private Map<T, Integer> counts = new HashMap<>();
+  private Map<T, Integer> counts;
   private int total = 0;
+  
+  public Counts() {
+    counts = new HashMap<>();
+  }
+  
+  public Counts(int expectedNumKeys) {
+    counts = new HashMap<>(expectedNumKeys);
+  }
 
   public int getCount(T t) {
     Integer c = counts.get(t);
