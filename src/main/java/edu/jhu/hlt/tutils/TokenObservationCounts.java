@@ -5,8 +5,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 import edu.jhu.hlt.concrete.Communication;
 import edu.jhu.hlt.concrete.Section;
@@ -51,6 +55,18 @@ public class TokenObservationCounts implements Serializable {
         cc.add(w, offset+1);
       }
     }
+    
+    public void dfsVisit(ArrayDeque<Trie> spine, Consumer<ArrayDeque<Trie>> visitor) {
+      spine.push(this);
+      visitor.accept(spine);
+      IntObjectHashMap<Trie>.Iterator iter = children.iterator();
+      while (iter.hasNext()) {
+        iter.advance();
+        Trie c = iter.value();
+        c.dfsVisit(spine, visitor);
+      }
+      spine.pop();
+    }
   }
   
   private Trie root;
@@ -71,9 +87,17 @@ public class TokenObservationCounts implements Serializable {
     for (String w : words)
       root.add(w, 0);
   }
+  
+  public static String reverse(String s) {
+    int n = s.length();
+    StringBuilder sb = new StringBuilder(n);
+    for (int i = n-1; i >= 0; i--)
+      sb.appendCodePoint(s.codePointAt(i));
+    return sb.toString();
+  }
 
   /** returns how many tokens trained on */
-  public int train(Communication c, boolean lowercase) {
+  public int train(Communication c, boolean lowercase, boolean reverse) {
     int tok = 0;
     if (c.isSetSectionList()) {
       for (Section section : c.getSectionList()) {
@@ -84,6 +108,8 @@ public class TokenObservationCounts implements Serializable {
               String w = t.getText();
               if (lowercase)
                 w = w.toLowerCase();
+              if (reverse)
+                w = reverse(w);
               root.add(w, 0);
               tok++;
             }
@@ -113,8 +139,42 @@ public class TokenObservationCounts implements Serializable {
     return s;
   }
   
-  public static void trainOnCommunications(List<File> commArchives, TokenObservationCounts t, TokenObservationCounts tLower) throws IOException {
-    assert t != null || tLower != null;
+  public List<String> possibleCompletionsOf(String w, int minCount) {
+    Trie t = root;
+    for (int i = 0; i < w.length() && t != null; i++)
+      t = t.children.get(w.codePointAt(i));
+    if (t == null)
+      return Collections.emptyList();
+
+    List<String> c = new ArrayList<>();
+    t.dfsVisit(new ArrayDeque<>(), spine -> {
+      if (spine.peek().count >= minCount) {
+        StringBuilder sb = new StringBuilder(w);
+        boolean first = true;
+        java.util.Iterator<Trie> spineItr = spine.descendingIterator();
+        while (spineItr.hasNext()) {
+          Trie cc = spineItr.next();
+          if (first) {
+            first = false;
+          } else {
+            sb.appendCodePoint(cc.codepoint);
+          }
+        }
+//        for (Trie cur : spine)
+//          sb.appendCodePoint(cur.codepoint);
+        sb.append('(');
+        sb.append(spine.peek().count);
+        sb.append(')');
+        c.add(sb.toString());
+      }
+    });
+    return c;
+  }
+  
+  public static void trainOnCommunications(List<File> commArchives,
+      TokenObservationCounts forwards, TokenObservationCounts forwardsLower,
+      TokenObservationCounts backwards, TokenObservationCounts backwardsLower) throws IOException {
+    assert forwards != null || forwardsLower != null;
     long n = 0;
     TimeMarker tm = new TimeMarker();
     for (File f : commArchives) {
@@ -122,20 +182,50 @@ public class TokenObservationCounts implements Serializable {
           TarGzArchiveEntryCommunicationIterator iter = new TarGzArchiveEntryCommunicationIterator(is)) {
         while (iter.hasNext()) {
           Communication c = iter.next();
-          if (t != null)
-            n += t.train(c, false);
-          if (tLower != null)
-            n += tLower.train(c, true);
+          if (forwards != null)
+            n += forwards.train(c, false, false);
+          if (forwardsLower != null)
+            n += forwardsLower.train(c, true, false);
+          if (backwards != null)
+            n += backwards.train(c, false, true);
+          if (backwardsLower != null)
+            n += backwardsLower.train(c, true, true);
           
           if (tm.enoughTimePassed(2)) {
-            Log.info("tokens=" + n + " archive=" + f.getPath());
+            Log.info("tokens=" + n + " archive=" + f.getPath()+ "\t" + memoryUsage());
           }
         }
       }
     }
   }
+
+  public static String memoryUsage() {
+    Runtime r = Runtime.getRuntime();
+    return String.format("MemoryUsage used=%.1fG free=%.1fG limit=%.1fG",
+        r.totalMemory() / (1024 * 1024 * 1024d),
+        r.freeMemory() / (1024 * 1024 * 1024d),
+        r.maxMemory() / (1024 * 1024 * 1024d));
+  }
   
-  public static void main(String[] args) {
+  public static void main(String[] args) throws IOException {
+    ExperimentProperties config = ExperimentProperties.init(args);
+    List<File> commArchives = config.getFileGlob("communications");
+    boolean lower = config.getBoolean("lowercase", false);
+    boolean reverse = config.getBoolean("reverse", false);
+    File out = config.getFile("output");
+    TokenObservationCounts f = null, fl = null, b = null, bl = null;
+    if (!reverse && !lower) f = new TokenObservationCounts();
+    if (!reverse && lower) fl = new TokenObservationCounts();
+    if (reverse && !lower) b = new TokenObservationCounts();
+    if (reverse && lower) bl = new TokenObservationCounts();
+    trainOnCommunications(commArchives, f, fl, b, bl);
+    if (!reverse && !lower) FileUtil.serialize(f, out);
+    if (!reverse && lower) FileUtil.serialize(fl, out);
+    if (reverse && !lower) FileUtil.serialize(b, out);
+    if (reverse && lower) FileUtil.serialize(bl, out);
+  }
+
+  public static void playing() {
     TokenObservationCounts t = new TokenObservationCounts();
     String s = "the quick brown fox jumped over the fence on thursday";
     t.train(s.split("\\s+"));
@@ -146,7 +236,47 @@ public class TokenObservationCounts implements Serializable {
     t.getPrefixOccuringAtLeast("the", 3);
     t.getPrefixOccuringAtLeast("thursday", 3);
     
-    for (String ss : s.split("\\s+"))
-      t.getPrefixOccuringAtLeast(ss, 1);
+    t.possibleCompletionsOf("t", 1);
+    t.possibleCompletionsOf("t", 2);
+    t.possibleCompletionsOf("t", 3);
+    
+    ArrayDeque<String> st = new ArrayDeque<>();
+    st.push("cats");
+    st.push("are");
+    st.push("farting");
+    for (String i : st)
+      System.out.println(i);
+    
+//    for (String ss : s.split("\\s+"))
+//      t.getPrefixOccuringAtLeast(ss, 1);
+
+    File f = new File("/tmp/tokenObs.lower.jser.gz");
+    Log.info("loading from " + f.getPath());
+    t = (TokenObservationCounts) FileUtil.deserialize(f);
+    List<String> words = Arrays.asList("frustratingly", "simple", "morphology",
+        "united", "nations", "how", "to", "determine", "break", "points",
+        "prefix", "adwords", "google", "stress-testing");
+    for (String w : words) {
+      String prev = null;
+      int prev_c = 0;
+      for (int c = 1; true; c++) {
+        String cur = t.getPrefixOccuringAtLeast(w, c);
+        if (cur.isEmpty())
+          break;
+        if (!cur.equals(prev)) {
+          double eps = 0.01;
+          double r = (c+eps) / (prev_c+eps);
+//          System.out.println(c + "\t" + ((int) Math.log(c)) + "\t" + r + "\t" + prev_c + "\t" + cur);
+          System.out.printf("%-20s%12.1f%12.1f", cur, r, Math.log(c));
+          if (r > 20 && cur.length() > 2)
+            System.out.println("\t" + t.possibleCompletionsOf(cur, 5));
+          else
+            System.out.println();
+          prev_c = c;
+        }
+        prev = cur;
+      }
+      System.out.println();
+    }
   }
 }
