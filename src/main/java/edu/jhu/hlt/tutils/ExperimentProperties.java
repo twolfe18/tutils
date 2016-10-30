@@ -11,6 +11,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -324,6 +325,11 @@ public class ExperimentProperties extends java.util.Properties {
    */
   public List<File> getFileGlob(String key, Predicate<File> keep) {
     String parentGlob = getString(key);
+    
+    if (parentGlob.isEmpty()) {
+      Log.info(key + " has empty value, returning empty list of files");
+      return Collections.emptyList();
+    }
 
     int i = parentGlob.indexOf("**");
     if (i < 0) {
