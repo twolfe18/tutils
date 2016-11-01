@@ -293,11 +293,13 @@ public class TokenObservationCounts implements Serializable {
 
       TokenObservationCounts f = null, fl = null, b = null, bl = null;
       if (load != null) {
+        Log.info("loading from " + load.getPath());
         if (!reverse && !lower) f = (TokenObservationCounts) FileUtil.deserialize(load);
         if (!reverse && lower) fl = (TokenObservationCounts) FileUtil.deserialize(load);
         if (reverse && !lower) b = (TokenObservationCounts) FileUtil.deserialize(load);
         if (reverse && lower) bl = (TokenObservationCounts) FileUtil.deserialize(load);
       } else {
+        Log.info("creating new TokenObservationCounts");
         if (!reverse && !lower) f = new TokenObservationCounts();
         if (!reverse && lower) fl = new TokenObservationCounts();
         if (reverse && !lower) b = new TokenObservationCounts();
