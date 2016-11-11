@@ -185,8 +185,9 @@ public class LabeledDirectedGraph implements Serializable {
         if (cur.numParents() == 0)
           return hops;
         if (cur.numParents() > 1)
-          throw new RuntimeException("not a tree");
+          throw new RuntimeException("not a tree, " + cur.getNodeIndex() + " has " + cur.numParents() + " parents");
         cur = cur.getParentNode(0);
+        hops++;
       }
     }
 
