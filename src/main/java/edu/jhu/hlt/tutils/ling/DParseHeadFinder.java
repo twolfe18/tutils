@@ -72,12 +72,8 @@ public class DParseHeadFinder implements HeadFinder {
       Node n = graph.getNode(i);
       if (n.numParents() + n.numChildren() == 0)
         continue;
-      assert n.numParents() <= 1;
-      if (!disableEdgeSkipping && edgesToSkip != null) {
-        int edge = n.getParentEdgeLabel(0);
-        if (edgesToSkip.get(edge))
-          continue;
-      }
+      if (!disableEdgeSkipping && skipEdgeFor(n))
+        continue;
       int d;
       try {
         d = n.computeDepthAssumingTree();
@@ -91,6 +87,18 @@ public class DParseHeadFinder implements HeadFinder {
       }
     }
     return shallowest;
+  }
+  
+  private boolean skipEdgeFor(LabeledDirectedGraph.Node n) {
+    if (edgesToSkip == null)
+      return false;
+    // Apply this to any parent edge
+    for (int i = 0; i < n.numParents(); i++) {
+      int edge = n.getParentEdgeLabel(0);
+      if (edgesToSkip.get(edge))
+        return true;
+    }
+    return false;
   }
   
   /**
