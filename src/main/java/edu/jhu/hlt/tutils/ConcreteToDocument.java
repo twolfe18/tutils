@@ -659,10 +659,11 @@ public class ConcreteToDocument {
         + c.getSituationMentionSetList().stream().map(SituationMentionSet::getMetadata).collect(Collectors.toList()));
     }
 
-    SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), situationMentionSetToolName);
+    boolean allowMissing = true;
+    SituationMentionSet sms = findByTool(c.getSituationMentionSetList(), situationMentionSetToolName, allowMissing);
     if (sms == null) {
-      System.err.println("failed to find SituationMentionSet by tool: " + situationMentionSetToolName
-        + " among: " + c.getSituationMentionSetList().stream().map(SituationMentionSet::getMetadata).collect(Collectors.toList()));
+      System.err.println("failed to find SituationMentionSet by tool: " + situationMentionSetToolName);
+//        + " among: " + c.getSituationMentionSetList().stream().map(SituationMentionSet::getMetadata).collect(Collectors.toList()));
       return Document.UNINITIALIZED;
     }
 
@@ -1039,13 +1040,13 @@ public class ConcreteToDocument {
       doc.cons_situationMentions_gold = addSituationMentionSetAsConstituents(
           c, situationMentionToolGold, constituentIndices, mapping, alph, addSituationMentionConsIdxToMapping);
       if (doc.cons_situationMentions_gold == Document.UNINITIALIZED)
-        throw new RuntimeException("couldn't find SituationMentions: " + propbankToolGold);
+        throw new RuntimeException("couldn't find SituationMentions: " + situationMentionToolGold);
     }
     if (situationMentionToolAuto != null) {
       doc.cons_situationMentions_auto = addSituationMentionSetAsConstituents(
           c, situationMentionToolAuto, constituentIndices, mapping, alph, addSituationMentionConsIdxToMapping);
       if (doc.cons_situationMentions_auto == Document.UNINITIALIZED)
-        throw new RuntimeException("couldn't find SituationMentions: " + propbankToolAuto);
+        throw new RuntimeException("couldn't find SituationMentions: " + situationMentionToolAuto);
     }
 
     // Add coref

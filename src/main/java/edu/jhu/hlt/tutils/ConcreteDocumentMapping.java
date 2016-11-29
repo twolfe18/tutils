@@ -115,8 +115,16 @@ public class ConcreteDocumentMapping implements Serializable {
     int c = cons.getIndex();
     UUID oldU = this.c2u.put(c, id);
     Integer oldC = this.u2c.put(id, c);
-    if (oldU != null || oldC != null)
-      throw new RuntimeException("duplicate c=" + c + " u=" + id + " cOld=" + oldC + " uOld=" + oldU);
+    if (oldC != null) {
+      throw new RuntimeException(String.format(
+          "there are two constituents (%s and %s) corresponding to the same UUID (%s)",
+          cons, oldC, id.getUuidString()));
+    }
+    if (oldU != null) {
+      throw new RuntimeException(String.format(
+          "there are two UUIDs (%s and %s) corresponding to the same constituent (%s)",
+          id.getUuidString(), oldU.getUuidString(), cons));
+    }
   }
 
   /**
