@@ -1,5 +1,6 @@
 package edu.jhu.hlt.tutils.features.indexing;
 
+import java.io.Serializable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,7 +23,9 @@ import edu.jhu.prim.list.IntArrayList;
  *
  * @author travis
  */
-public class FNode<T> {
+public class FNode<T> implements Serializable {
+  private static final long serialVersionUID = -984679673466640586L;
+
   private int globalType = -1;
   private int globalFeature = -1;   // for one-part feature indices
   private int localFeature = -1;    // uniquely identifies this node w.r.t. its parent

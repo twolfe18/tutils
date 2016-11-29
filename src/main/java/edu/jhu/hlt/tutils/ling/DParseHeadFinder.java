@@ -70,6 +70,8 @@ public class DParseHeadFinder implements HeadFinder {
     int depth = -1;
     for (int i = first; i <= last; i++) {
       Node n = graph.getNode(i);
+      if (n == null)
+        continue;
       if (n.numParents() + n.numChildren() == 0)
         continue;
       if (!disableEdgeSkipping && skipEdgeFor(n))
@@ -125,7 +127,7 @@ public class DParseHeadFinder implements HeadFinder {
     int left = h;
     while (left > first) {
       Node n = graph.getNode(left-1);
-      if (n.numParents() == 1 && n.getParentEdgeLabel(0) == nnEdgeType)
+      if (n != null && n.numParents() == 1 && n.getParentEdgeLabel(0) == nnEdgeType)
         left--;
       else
         break;
@@ -133,7 +135,7 @@ public class DParseHeadFinder implements HeadFinder {
     int right = h;
     while (right < last) {
       Node n = graph.getNode(right+1);
-      if (n.numParents() == 1 && n.getParentEdgeLabel(0) == nnEdgeType)
+      if (n != null && n.numParents() == 1 && n.getParentEdgeLabel(0) == nnEdgeType)
         right++;
       else
         break;
