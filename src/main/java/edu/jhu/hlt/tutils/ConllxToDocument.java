@@ -76,8 +76,10 @@ public class ConllxToDocument {
             sent.setLeftSib(prevSent.index);
           }
           sent.setFirstToken(sentenceOffset);
-          sent.setLastToken(token);
+          assert token > 0;
+          sent.setLastToken(token-1);
           sentenceOffset = token;
+          prevSent = sent;
         } else {
           // New token
           token++;

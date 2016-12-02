@@ -91,7 +91,7 @@ public class StringUtils {
     for (Object i : items) {
       if (sb.length() > 0)
         sb.append(sep);
-      sb.append(i.toString());
+      sb.append(i == null ? "null" : i.toString());
     }
     return sb.toString();
   }
