@@ -390,6 +390,8 @@ public class ExperimentProperties extends java.util.Properties {
     String value = getProperty(key);
     if (value == null)
       throw new RuntimeException("comma-separated string value not found for key: " + key);
+    if (value.isEmpty())
+      return new String[] {};
     return value.split(",");
 //    return getStrings(key, ",");
   }
@@ -405,6 +407,8 @@ public class ExperimentProperties extends java.util.Properties {
       put(key, StringUtils.join(",", defaultValue));
       return defaultValue;
     }
+    if (value.isEmpty())
+      return new String[] {};
     return value.split(",");
   }
 //  public String[] getStrings(String key, String sep, String[] defaultValue) {
@@ -421,6 +425,8 @@ public class ExperimentProperties extends java.util.Properties {
       put(key, defaultValue);
       return new String[] {defaultValue};
     }
+    if (value.isEmpty())
+      return new String[] {};
     return value.split(",");
   }
 
