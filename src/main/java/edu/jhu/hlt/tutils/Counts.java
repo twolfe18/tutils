@@ -79,6 +79,24 @@ public class Counts<T> implements Serializable {
     public int numNonZero() {
       return counts.size();
     }
+
+    public List<R> getKeysSortedByCount(final boolean descending) {
+      List<R> items = new ArrayList<>();
+      items.addAll(counts.keySet());
+      Collections.sort(items, new Comparator<R>() {
+        @Override
+        public int compare(R arg0, R arg1) {
+          double c0 = getCount(arg0);
+          double c1 = getCount(arg1);
+          if(c0 == c1) return 0;
+          if((c1 < c0) ^ descending)
+            return 1;
+          else
+            return -1;
+        }
+      });
+      return items;
+    }
   }
 
   private Map<T, Integer> counts;
@@ -185,7 +203,7 @@ public class Counts<T> implements Serializable {
         int c0 = getCount(arg0);
         int c1 = getCount(arg1);
         if(c0 == c1) return 0;
-        if(c1 < c0 ^ descending)
+        if((c1 < c0) ^ descending)
           return 1;
         else
           return -1;
