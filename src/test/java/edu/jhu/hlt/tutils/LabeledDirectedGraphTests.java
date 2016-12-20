@@ -1,9 +1,12 @@
 package edu.jhu.hlt.tutils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.function.IntFunction;
 
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
@@ -11,6 +14,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import edu.jhu.hlt.concrete.Communication;
+import edu.jhu.hlt.tutils.Document.ConstituentItr;
 import edu.jhu.hlt.tutils.ling.Language;
 
 public class LabeledDirectedGraphTests {
@@ -77,5 +81,40 @@ public class LabeledDirectedGraphTests {
     System.out.println(a - start);
     System.out.println(b - a);
     System.out.println(c - b);
+  }
+  
+  @Test
+  public void dfsShowTest() throws Exception {
+    File p = new File("/home/travis/code/fnparse/");
+    File f = new File(p, "data/parma/ecbplus/ECB+_LREC2014/concrete-parsey-and-stanford/12_9ecbplus.comm");
+    Communication comm = new Communication();
+    try (InputStream b = FileUtil.getInputStream(f)) {
+      comm.read(new TCompactProtocol(new TIOStreamTransport(b)));
+    }
+
+    ConcreteToDocument c2d = new ConcreteToDocument(null, null, null, Language.EN);
+    c2d.readParsey();
+    ConcreteDocumentMapping cdm = c2d.communication2Document(comm, -1, new MultiAlphabet(), c2d.lang);
+    Document d = cdm.getDocument();
+    
+//    System.out.println(d.parseyMcParseFace.toString(d.getAlphabet()));
+    
+    assertNotNull(d.parseyMcParseFace);
+    
+    // DFS should work from any node in the first sentence
+    assertTrue(d.cons_sentences >= 0);
+    IntFunction<String> showNode = i -> d.getWordStr(i) + "@" + i + " nParent=" + d.parseyMcParseFace.getNode(i).numParents();
+//    IntFunction<String> showNode = i -> d::getWordStr;
+    IntFunction<String> showEdge = d.getAlphabet()::dep;
+    int maxSent = 5, sent = 0;
+    for (ConstituentItr ci = d.getConstituentItr(d.cons_sentences); ci.isValid(); ci.gotoRightSib()) {
+      Log.info("looking at " + ci);
+      for (int tok = ci.getFirstToken(); tok <= ci.getLastToken(); tok++) {
+        Log.info("dfs from token " + tok);
+        d.parseyMcParseFace.dfsShow(tok, showNode, showEdge, "dfs(" + tok + ")", System.out);
+      }
+      if (++sent >= maxSent)
+        break;
+    }
   }
 }

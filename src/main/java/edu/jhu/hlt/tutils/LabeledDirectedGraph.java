@@ -2,12 +2,14 @@ package edu.jhu.hlt.tutils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.Serializable;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Iterator;
 import java.util.Random;
+import java.util.function.IntFunction;
 
 import edu.jhu.hlt.concrete.Communication;
 import edu.jhu.hlt.concrete.Dependency;
@@ -148,6 +150,36 @@ public class LabeledDirectedGraph implements Serializable {
       return String.format("%d->%d %s\n", node, conode, e);
     else
       return String.format("%d<-%d %s\n", node, conode, e);
+  }
+  
+  public void dfsShow(int root, IntFunction<String> showNode, IntFunction<String> showEdge, String linePrefix, PrintStream out) {
+    dfsShow(root, null, showNode, showEdge, linePrefix, out, new BitSet());
+  }
+  private void dfsShow(int node, Long howWeGotToNode, IntFunction<String> showNode, IntFunction<String> showEdge, String linePrefix, PrintStream out, BitSet seen) {
+    // Check/mark whether we've visited this node
+    if (seen.get(node))
+      return;
+    seen.set(node);
+    
+    // Show this node (and the edge leading here)
+    if (howWeGotToNode != null) {
+      int e = unpackEdge(howWeGotToNode);
+      out.println(linePrefix + showEdge.apply(e) + " " + showNode.apply(node));
+    } else {
+      out.println(linePrefix + showNode.apply(node));
+    }
+    
+    // Recurse
+    Node n = getNode(node);
+    if (n != null) {
+      String twoSpaces = "  ";
+      String cLinePrefix = linePrefix + twoSpaces;
+      for (int i = 0; i < n.numChildren(); i++) {
+        int child = n.getChild(i);
+        long childEdge = n.getChildEdge(i);
+        dfsShow(child, childEdge, showNode, showEdge, cLinePrefix, out, seen);
+      }
+    }
   }
 
   /**
