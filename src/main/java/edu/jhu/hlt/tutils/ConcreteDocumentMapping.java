@@ -105,6 +105,14 @@ public class ConcreteDocumentMapping implements Serializable {
   public int size() {
     return c2u.size();
   }
+  
+  public boolean containsUuid(UUID uuid) {
+    return u2c.containsKey(uuid);
+  }
+  
+  public boolean containsId(int id) {
+    return c2u.containsKey(id);
+  }
 
   /**
    * @param cons

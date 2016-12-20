@@ -104,7 +104,7 @@ public class ConcreteToDocument {
   public boolean debug = false;
   public boolean debug_cons = false;
   public boolean debug_deps = false;
-  public boolean debug_propbank = false;
+  public boolean debug_situations_to_cons = false;
   public boolean log_cons_id_conversion = false;   // issue related to concrete Constituent id vs index
   public boolean log_no_entities = true;
 
@@ -654,7 +654,7 @@ public class ConcreteToDocument {
 
     Document doc = mapping.getDocument();
 
-    if (debug_propbank) {
+    if (debug_situations_to_cons) {
       Log.info("adding propbank for " + doc.getId() + " sms="
         + c.getSituationMentionSetList().stream().map(SituationMentionSet::getMetadata).collect(Collectors.toList()));
     }
@@ -667,7 +667,7 @@ public class ConcreteToDocument {
       return Document.UNINITIALIZED;
     }
 
-    if (debug_propbank)
+    if (debug_situations_to_cons)
       Log.info("numSituations=" + sms.getMentionListSize());
 
     int first = Document.NONE;
@@ -708,8 +708,8 @@ public class ConcreteToDocument {
 
       // Set sit -> pred
       sit.setOnlyChild(pred.getIndex());
-      if (debug_propbank) {
-        Log.info("adding Situation text=\"" + sm.getText());
+      if (debug_situations_to_cons) {
+        Log.info("adding Situation text=\"" + sm.getText() + "\"");
         Log.info("pred.firstToken=" + pred.getFirstToken()
             + " pred.lastToken=" + pred.getLastToken());
       }
@@ -743,7 +743,7 @@ public class ConcreteToDocument {
         if (argc.getLastToken() > lastT)
           lastT = argc.getLastToken();
 
-        if (debug_propbank) {
+        if (debug_situations_to_cons) {
           Log.info("setting arg, role=" + arg.getRole()
               + " first=" + argc.getFirstToken()
               + " last=" + argc.getLastToken()
@@ -761,7 +761,7 @@ public class ConcreteToDocument {
       sit.setFirstToken(firstT);
       sit.setLastToken(lastT);
 
-      if (debug_propbank) {
+      if (debug_situations_to_cons) {
         Log.info("sit.firstToken=" + sit.getFirstToken()
             + " sit.lastToken=" + sit.getLastToken()
             + " numArgs=" + numArgs);
@@ -826,6 +826,8 @@ public class ConcreteToDocument {
       System.out.println("corefMentionToolGold=" + this.corefMentionToolGold);
       System.out.println("corefToolAuto=" + this.corefToolAuto);
       System.out.println("corefToolGold=" + this.corefToolGold);
+      System.out.println("situationMentionToolAuto=" + this.situationMentionToolAuto);
+      System.out.println("situationMentionToolGold=" + this.situationMentionToolGold);
     }
 
     Document doc = new Document(c.getId(), docIndex, alph);
@@ -1019,7 +1021,7 @@ public class ConcreteToDocument {
 
     // Add Propbank SRL
     if (propbankToolGold != null) {
-      if (debug_propbank)
+      if (debug_situations_to_cons)
         Log.info("adding propbankToolGold=" + propbankToolGold);
       doc.cons_propbank_gold = addSituationMentionSetAsConstituents(
           c, propbankToolGold, constituentIndices, mapping, alph, addSituationMentionConsIdxToMapping);
@@ -1027,7 +1029,7 @@ public class ConcreteToDocument {
         throw new RuntimeException("couldn't find gold propbank: " + propbankToolGold);
     }
     if (propbankToolAuto != null) {
-      if (debug_propbank)
+      if (debug_situations_to_cons)
         Log.info("adding propbankToolAuto=" + propbankToolAuto);
       doc.cons_propbank_auto = addSituationMentionSetAsConstituents(
           c, propbankToolAuto, constituentIndices, mapping, alph, addSituationMentionConsIdxToMapping);
