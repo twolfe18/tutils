@@ -1,5 +1,6 @@
 package edu.jhu.hlt.tutils;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -9,7 +10,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-public interface Beam<T> extends Iterable<T> {
+public interface Beam<T> extends Iterable<T>, Serializable {
 
   /**
    * How many items are on the beam.
@@ -71,7 +72,9 @@ public interface Beam<T> extends Iterable<T> {
    * This means that if you are putting these into anything that implements
    * {@link Set} and compareTo returns 0, you will lose an {@link Item}!
    */
-  public static final class Item<T> implements Comparable<Item<T>> {
+  public static final class Item<T> implements Comparable<Item<T>>, Serializable {
+    private static final long serialVersionUID = 2883199674665691420L;
+
     private final T item;
     private final double score;
     private final int scoreTiebreaker;     // breaks ties when scores are equal
@@ -122,7 +125,9 @@ public interface Beam<T> extends Iterable<T> {
    * An efficient width-4 beam.
    * TODO Do better testing, I think this may have a bug.
    */
-  public static class Beam4<T> implements Beam<T> {
+  public static class Beam4<T> implements Beam<T>, Serializable {
+    private static final long serialVersionUID = 4372756823072541320L;
+
     private Item<T> x1, x2, x3, x4;
     private int size = 0;
     private int tieCtr = 0;
@@ -249,7 +254,9 @@ public interface Beam<T> extends Iterable<T> {
   /**
    * An efficient width-1 beam.
    */
-  public static class Beam1<T> implements Beam<T> {
+  public static class Beam1<T> implements Beam<T>, Serializable {
+    private static final long serialVersionUID = 67275305786744127L;
+
     private Item<T> x1;
 
     @Override
@@ -347,7 +354,9 @@ public interface Beam<T> extends Iterable<T> {
   /**
    * A beam implemented by a TreeSet.
    */
-  public static class BeamN<T> implements Beam<T> {
+  public static class BeamN<T> implements Beam<T>, Serializable {
+    private static final long serialVersionUID = 6164712635641696698L;
+
     private SortedSet<Item<T>> beam;
     private int width;
     private int tieCtr = 0;
