@@ -43,7 +43,7 @@ public class IntPair implements Serializable {
   /**
    * Compares on first first, then second. Lower values appear first.
    */
-  public static Comparator<IntPair> ASCENDING = new Comparator<IntPair>() {
+  public static final Comparator<IntPair> ASCENDING = new Comparator<IntPair>() {
     @Override
     public int compare(IntPair o1, IntPair o2) {
       if (o1.first < o2.first)
@@ -61,7 +61,7 @@ public class IntPair implements Serializable {
   /**
    * Compares on first first, then second. Higher values appear first.
    */
-  public static Comparator<IntPair> DESCENDING = new Comparator<IntPair>() {
+  public static final Comparator<IntPair> DESCENDING = new Comparator<IntPair>() {
     @Override
     public int compare(IntPair o1, IntPair o2) {
       return -ASCENDING.compare(o1, o2);
