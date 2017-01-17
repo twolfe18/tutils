@@ -1,7 +1,13 @@
 package edu.jhu.hlt.tutils;
 
+import java.io.Closeable;
 import java.io.PrintStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MultiTimer {
   private Map<String, Timer> timers = new HashMap<String, Timer>();
@@ -34,6 +40,18 @@ public class MultiTimer {
       timers.put(key, t);
     }
     return t;
+  }
+  
+  public class TB implements Closeable {
+    private String name;
+    public TB(String name) {
+      this.name = name;
+      start(name);
+    }
+    @Override
+    public void close() {
+      stop(name);
+    }
   }
 
   public void start(String key) {

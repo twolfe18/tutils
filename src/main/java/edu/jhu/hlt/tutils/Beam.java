@@ -369,6 +369,21 @@ public interface Beam<T> extends Iterable<T>, Serializable {
       this.beam = new TreeSet<>();  // use Item natural ordering
     }
 
+    /**
+     * Returns an evicted value or null if wasn't full.
+     */
+    public Item<T> push2(T item, double score) {
+      Item<T> i = new Item<>(item, score, tieCtr++);
+      beam.add(i);
+      if (beam.size() > width && width > 0) {
+        Item<T> evict = beam.last();
+        beam.remove(evict);
+        return evict;
+      } else {
+        return null;
+      }
+    }
+
     public boolean push(T item, double score) {
       Item<T> i = new Item<>(item, score, tieCtr++);
       beam.add(i);
