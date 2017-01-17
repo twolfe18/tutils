@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 public class MultiTimer {
+  public static boolean LOG_STARTS_AND_STOPS = false;
+
   private Map<String, Timer> timers = new HashMap<String, Timer>();
   private long firstStart = -1;
 
@@ -55,6 +57,8 @@ public class MultiTimer {
   }
 
   public void start(String key) {
+    if (LOG_STARTS_AND_STOPS)
+      Log.info("key=" + key);
     Timer t = timers.get(key);
     if(t == null) {
       t = new Timer(key);
@@ -72,6 +76,8 @@ public class MultiTimer {
 
   /** returns the time taken between the last start/stop pair for this key */
   public long stop(String key) {
+    if (LOG_STARTS_AND_STOPS)
+      Log.info("key=" + key);
     Timer t = timers.get(key);
     if(t == null)
       throw new IllegalArgumentException("there is no timer for " + key);
