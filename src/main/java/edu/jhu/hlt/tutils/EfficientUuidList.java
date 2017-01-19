@@ -1,6 +1,8 @@
 package edu.jhu.hlt.tutils;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Concrete UUIDs use Strings internally, where you pay 2 bytes * (32+4) chars =
@@ -21,14 +23,17 @@ public class EfficientUuidList {
   public int size() {
     return size;
   }
-  
-  public void add(String uuidString) {
+
+  public void add(java.util.UUID u) {
     if (size*2 == buf.length)
       buf = Arrays.copyOf(buf, buf.length+2);
-    java.util.UUID u = java.util.UUID.fromString(uuidString);
     buf[2*size+0] = u.getMostSignificantBits();
     buf[2*size+1] = u.getLeastSignificantBits();
     size++;
+  }
+  
+  public void add(String uuidString) {
+    add(java.util.UUID.fromString(uuidString));
   }
   
   public java.util.UUID get(int i) {
@@ -40,6 +45,24 @@ public class EfficientUuidList {
   
   public String getString(int i) {
     return get(i).toString();
+  }
+  
+  /**
+   * Computes the intersection of a and b, internally using a {@link HashSet} of {@link java.util.UUID}
+   */
+  public static EfficientUuidList hashJoin(EfficientUuidList a, EfficientUuidList b) {
+    Set<java.util.UUID> common = new HashSet<>();
+    int na = a.size();
+    for (int i = 0; i < na; i++)
+      common.add(a.get(i));
+    EfficientUuidList out = new EfficientUuidList(16);
+    int nb = b.size();
+    for (int i = 0; i < nb; i++) {
+      java.util.UUID u = b.get(i);
+      if (common.remove(u))
+        out.add(u);
+    }
+    return out;
   }
   
   public static void simpleTest() {
