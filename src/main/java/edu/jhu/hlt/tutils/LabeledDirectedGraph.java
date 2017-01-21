@@ -5,10 +5,15 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.Serializable;
 import java.nio.file.Files;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.IntFunction;
 
 import edu.jhu.hlt.concrete.Communication;
@@ -16,9 +21,11 @@ import edu.jhu.hlt.concrete.Dependency;
 import edu.jhu.hlt.concrete.DependencyParse;
 import edu.jhu.hlt.concrete.Section;
 import edu.jhu.hlt.concrete.Sentence;
+import edu.jhu.hlt.concrete.Token;
 import edu.jhu.hlt.concrete.Tokenization;
 import edu.jhu.hlt.concrete.serialization.TarGzCompactCommunicationSerializer;
 import edu.jhu.hlt.concrete.util.ConcreteException;
+import edu.jhu.hlt.tutils.hash.Hash;
 
 /**
  * Adjacency list style graph representation.
@@ -572,19 +579,80 @@ public class LabeledDirectedGraph implements Serializable {
     else
       return unpackNode(edge);
   }
+  
+  private static int[] toArray(List<Integer> path, boolean includeEndpoints) {
+    int[] a;
+    int n = path.size();
+    if (includeEndpoints) {
+      a = new int[n];
+      for (int i = 0; i < n; i++)
+        a[i] = path.get(i);
+    } else {
+      a = new int[n-2];
+      int j = 0;
+      for (int i = 1; i < n-1; i++)
+        a[j++] = path.get(i);
+    }
+    return a;
+  }
+  
+  /**
+   * Returns the nodes along the path from source to sink
+   * @param bidirectional if false, only consider children of source, and children of those, and so on...
+   * @param includeEndpoints says whether source and sink appear as the first and last items in the returned path
+   * @return null if there is no path
+   */
+  public int[] shortestPath(int source, int sink, boolean bidirectional, boolean includeEndpoints) {
+    // BFS
+    Set<Integer> seen = new HashSet<>();
+    ArrayDeque<LL<Integer>> q = new ArrayDeque<>();
+    q.addLast(new LL<>(source, null));
+    seen.add(source);
+    while (!q.isEmpty()) {
+      LL<Integer> p = q.pollFirst();
+      
+      if (p.item == sink) {
+        boolean reverse = true;
+        List<Integer> path = p.toList(reverse);
+        return toArray(path, includeEndpoints);
+      }
+
+      Node n = getNode(p.item);
+
+      List<Integer> neighbors = new ArrayList<>();
+      for (int i = 0; i < n.numChildren(); i++)
+        neighbors.add(n.getChild(i));
+      if (bidirectional) {
+        for (int i = 0; i < n.numParents(); i++)
+          neighbors.add(n.getParent(i));
+      }
+      
+      for (int c : neighbors)
+        if (seen.add(c))
+          q.addLast(new LL<>(c, p));
+    }
+    return null;
+  }
 
   /**
    * Uses 0-indexes for tokens with n as root/wall (where n is the length of the
    * sentence).
    * @param n is the length of the sentence/tokenization. Since a dependency
    * parse need not (necessarily) cover all the tokens, this is required.
+   * @param alph may be null, in which case we use the {@link Hash#hash(String)}
    */
   public static LabeledDirectedGraph fromConcrete(DependencyParse p, int n, MultiAlphabet alph) {
     LabeledDirectedGraph.Builder g = new LabeledDirectedGraph().new Builder();
     // TODO check p is 0-indexed
     // TODO warn if p is tree
     for (Dependency d : p.getDependencyList()) {
-      int e = alph.dep(d.getEdgeType());
+      int e;
+      if (alph != null) {
+        e = alph.dep(d.getEdgeType());
+      } else {
+        e = Hash.hash(d.getEdgeType());
+        e &= (1<<(EDGE_LABEL_BITS-1))-1;    // mask off bits which wont fit
+      }
       int gov = n;
       if (d.isSetGov() && d.getGov() >= 0) {
         gov = d.getGov();
@@ -644,20 +712,27 @@ grep -P '^\d+\D{2}\d+ \S+|Dependency' -n /tmp/LabeledDirectedGraph.log | head -n
       for (Section section : c.getSectionList()) {
         for (Sentence sentence : section.getSentenceList()) {
           Tokenization t = sentence.getTokenization();
-          int n = t.getTokenList().getTokenListSize();
+//          int n = t.getTokenList().getTokenListSize();
           for (DependencyParse p : t.getDependencyParseList()) {
-            printEdges(p, n);
-            testTraversals(p, n);
+//            printEdges(p, n);
+            testTraversals(p, t.getTokenList().getTokenList());
           }
         }
       }
     }
   }
 
-  public static void testTraversals(DependencyParse p, int n) {
+  public static void testTraversals(DependencyParse p, List<Token> toks) {
+    int n = toks.size();
+
     // Print according to Concrete
+    System.out.println(p.getMetadata());
     for (Dependency d : p.getDependencyList())
       System.out.println(d);
+    for (int i = 0; i < n; i++) {
+      System.out.printf("%d\t%s\n", i, toks.get(i).getText());
+    }
+    System.out.println();
 
     MultiAlphabet alph = new MultiAlphabet();
     LabeledDirectedGraph g = LabeledDirectedGraph.fromConcrete(p, n, alph);
@@ -665,21 +740,40 @@ grep -P '^\d+\D{2}\d+ \S+|Dependency' -n /tmp/LabeledDirectedGraph.log | head -n
     // Take random paths up the graph
     Random r = new Random(9001);
     Node node = g.getNode(r.nextInt(g.getNumNodes()));
+    System.out.println("random walk UP from " + node.getNodeIndex());
     while (node.numParents() > 0) {
       System.out.println(node + " UP");
       int pi = r.nextInt(node.numParents());
       System.out.println(showEdge(node.getParentEdge(pi), alph));
       node.gotoParentNode(pi);
     }
+    System.out.println();
 
     // Take random paths down the graph
     node = g.getNode(r.nextInt(g.getNumNodes()));
+    System.out.println("random walk DOWN from " + node.getNodeIndex());
     while (node.numChildren() > 0) {
       System.out.println(node + " DOWN");
       int pi = r.nextInt(node.numChildren());
       System.out.println(showEdge(node.getChildEdge(pi), alph));
       node.gotoChildNode(pi);
     }
+    System.out.println();
+    
+    // Take some shortest paths
+    int lo = r.nextInt(n-1);
+    int hi = lo + r.nextInt(n-lo);
+    assert lo < hi && hi < n;
+    int[] path = g.shortestPath(lo, hi, true, true);
+    System.out.println("shortest path from " + lo + " to " + hi);
+    if (path == null) {
+      System.out.println("NONE");
+    } else {
+      for (int i : path) {
+        System.out.println(toks.get(i));
+      }
+    }
+    System.out.println();
   }
 
   /** Shows the edges according to Concrete as well as the ingested form */
