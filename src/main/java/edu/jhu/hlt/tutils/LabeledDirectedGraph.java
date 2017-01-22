@@ -607,7 +607,6 @@ public class LabeledDirectedGraph implements Serializable {
     Set<Integer> seen = new HashSet<>();
     ArrayDeque<LL<Integer>> q = new ArrayDeque<>();
     q.addLast(new LL<>(source, null));
-    seen.add(source);
     while (!q.isEmpty()) {
       LL<Integer> p = q.pollFirst();
       
@@ -618,18 +617,21 @@ public class LabeledDirectedGraph implements Serializable {
       }
 
       Node n = getNode(p.item);
+      if (!seen.add(p.item))
+        continue;
 
       List<Integer> neighbors = new ArrayList<>();
-      for (int i = 0; i < n.numChildren(); i++)
+      int nc = n.numChildren();
+      for (int i = 0; i < nc; i++)
         neighbors.add(n.getChild(i));
       if (bidirectional) {
-        for (int i = 0; i < n.numParents(); i++)
+        int np = n.numParents();
+        for (int i = 0; i < np; i++)
           neighbors.add(n.getParent(i));
       }
       
       for (int c : neighbors)
-        if (seen.add(c))
-          q.addLast(new LL<>(c, p));
+        q.addLast(new LL<>(c, p));
     }
     return null;
   }
