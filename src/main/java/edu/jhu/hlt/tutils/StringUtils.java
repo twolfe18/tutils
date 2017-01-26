@@ -102,6 +102,12 @@ public class StringUtils {
     return s.substring(0, maxLength);
   }
 
+  public static String trimPretty(String s, int maxLength) {
+    if (s.length() <= maxLength)
+      return s;
+    return s.substring(0, maxLength-3) + "...";
+  }
+
   public static void main(String[] args) {
     List<String> ss = new ArrayList<>();
     ss.addAll(Arrays.asList("foo", "abc", "", "a", "zz", "zzz", "_z", "z_", "p_2", "p_1", "p_22"));
