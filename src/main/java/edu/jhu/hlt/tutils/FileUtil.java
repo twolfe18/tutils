@@ -21,6 +21,7 @@ import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -41,6 +42,21 @@ public class FileUtil {
       e.printStackTrace();
       return null;
     }
+  }
+  
+  public static byte[] readBytes(InputStream is) throws IOException {
+    int read = 0;
+    int bs = 4096;
+    byte[] buf = new byte[4 * bs];
+    while (true) {
+      if (read + bs >= buf.length)
+        buf = Arrays.copyOf(buf, (int) (1.6 * buf.length + 1));
+      int r = is.read(buf, read, bs);
+      if (r <= 0)
+        break;
+      read += r;
+    }
+    return Arrays.copyOfRange(buf, 0, read);
   }
   
   public static String getContents(File f, boolean replaceNewlinesWithSpaces) {
