@@ -204,6 +204,10 @@ Z(4) = 4*3/2 = 6
   public boolean covers(Span other) {
     return this.start <= other.start && other.end <= this.end;
   }
+  
+  public boolean covers(int i) {
+    return this.start <= i && i < this.end;
+  }
 
   public boolean crosses(Span other) {
     /*

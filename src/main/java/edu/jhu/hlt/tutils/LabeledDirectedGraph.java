@@ -343,6 +343,17 @@ public class LabeledDirectedGraph implements Serializable {
       this.numChildren = -1;
       return oldNode;
     }
+    
+    public int[] getNeighbors() {
+      int p = numParents();
+      int c = numChildren();
+      int[] n = new int[p + c];
+      for (int i = 0; i < p; i++)
+        n[i] = getParent(i);
+      for (int i = 0; i < c; i++)
+        n[i+p] = getChild(i);
+      return n;
+    }
   }
 
   /**
@@ -583,11 +594,14 @@ public class LabeledDirectedGraph implements Serializable {
   private static int[] toArray(List<Integer> path, boolean includeEndpoints) {
     int[] a;
     int n = path.size();
+    assert n > 0;
     if (includeEndpoints) {
       a = new int[n];
       for (int i = 0; i < n; i++)
         a[i] = path.get(i);
     } else {
+      if (n == 1)   // source == sink
+        return new int[0];
       a = new int[n-2];
       int j = 0;
       for (int i = 1; i < n-1; i++)
