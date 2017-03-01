@@ -43,6 +43,12 @@ public class FileUtil {
       return null;
     }
   }
+
+  public static byte[] readBytes(File f) throws IOException {
+    try (InputStream is = getInputStream(f)) {
+      return readBytes(is);
+    }
+  }
   
   public static byte[] readBytes(InputStream is) throws IOException {
     int read = 0;

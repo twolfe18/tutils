@@ -6,6 +6,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
@@ -125,6 +126,35 @@ Z(4) = 4*3/2 = 6
   // also, you can use ==
   // this table is indexed as [start][width - 1]
   private static Span[][] internedSpans = new Span[0][0];
+ 
+  /**
+   * @param tokens is an inclusive set of spans
+   * @param strict checks that tokens is ascending and contiguous
+   */
+  public static Span getSpan(List<Integer> tokens, boolean strict) {
+    int[] a = new int[tokens.size()];
+    for (int i = 0; i < a.length; i++)
+      a[i] = tokens.get(i);
+    return getSpan(a, strict);
+  }
+
+  /**
+   * @param tokens is an inclusive set of spans
+   * @param strict checks that tokens is ascending and contiguous
+   */
+  public static Span getSpan(int[] tokens, boolean strict) {
+    if (tokens.length == 0)
+      return nullSpan;
+    if (strict) {
+      int prev = tokens[0];
+      for (int i = 1; i < tokens.length; i++) {
+        if (prev+1 != tokens[i])
+          throw new IllegalArgumentException("not contiguous and ascending: " + Arrays.toString(tokens));
+        prev = tokens[i];
+      }
+    }
+    return Span.getSpan(tokens[0], tokens[tokens.length-1]+1);
+  }
 
   public static Span getSpan(int start, int end) {
     // don't store this in the table, because all other spans will

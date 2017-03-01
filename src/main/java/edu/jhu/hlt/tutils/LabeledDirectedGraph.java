@@ -355,6 +355,30 @@ public class LabeledDirectedGraph implements Serializable {
       return n;
     }
   }
+  
+  /**
+   * Takes a slice of this graph of the nodes which are (inclusively) in the given range.
+   * The node indices of the returned graph are shifted down by firstNode.
+   * This is useful, e.g. for converting a graph for the dependency parses for an entire document (tutils style)
+   * to a sentence-relative graph (conll/fnparse/etc) style.
+   * 
+   * TODO Test this!
+   */
+  public LabeledDirectedGraph slice(int firstNode, int lastNode) {
+    Builder b = new LabeledDirectedGraph().new Builder();
+    for (int i = firstNode; i <= lastNode; i++) {
+      Node n = getNode(i);
+      int nc = n.numChildren();
+      for (int j = 0; j < nc; j++) {
+        int c = n.getChild(j);
+        if (firstNode <= c && c <= lastNode) {
+          int e = n.getChildEdgeLabel(j);
+          b.add(i - firstNode, c - firstNode, e);
+        }
+      }
+    }
+    return b.freeze();
+  }
 
   /**
    * Helps build LabeledDirectedGraphs.
