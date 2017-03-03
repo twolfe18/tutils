@@ -31,6 +31,15 @@ import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream
 
 public class FileUtil {
   public static boolean VERBOSE = false;
+  
+  public static void writeLines(Iterable<String> lines, File to) throws IOException {
+    try (BufferedWriter w = getWriter(to)) {
+      for (String l : lines) {
+        w.write(l);
+        w.newLine();
+      }
+    }
+  }
 
   public static List<String> getLines(File f) {
     try (BufferedReader r = getReader(f)) {
