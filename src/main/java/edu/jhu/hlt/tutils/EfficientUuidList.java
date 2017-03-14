@@ -1,5 +1,6 @@
 package edu.jhu.hlt.tutils;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -22,6 +23,16 @@ public class EfficientUuidList {
   
   public int size() {
     return size;
+  }
+  
+  public void add(byte[] uuid) {
+    if (uuid.length != 16)
+      throw new IllegalArgumentException();
+    if (size*2 == buf.length)
+      buf = Arrays.copyOf(buf, buf.length+2);
+    ByteBuffer bb = ByteBuffer.wrap(uuid);
+    buf[2*size+0] = bb.getLong();
+    buf[2*size+1] = bb.getLong();
   }
 
   public void add(java.util.UUID u) {
