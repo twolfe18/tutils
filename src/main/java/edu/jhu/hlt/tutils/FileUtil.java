@@ -29,6 +29,8 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 
+import edu.jhu.prim.list.DoubleArrayList;
+
 public class FileUtil {
   public static boolean VERBOSE = false;
   
@@ -50,6 +52,15 @@ public class FileUtil {
     } catch (IOException e) {
       e.printStackTrace();
       return null;
+    }
+  }
+  
+  public static DoubleArrayList getLinesAsDoubles(File f) throws IOException {
+    try (BufferedReader r = getReader(f)) {
+      DoubleArrayList lines = new DoubleArrayList();
+      for (String l = r.readLine(); l != null; l = r.readLine())
+        lines.add(Double.parseDouble(l));
+      return lines;
     }
   }
 
