@@ -2,6 +2,7 @@ package edu.jhu.hlt.tutils;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -193,6 +194,18 @@ public class Counts<T> implements Serializable {
     Collections.sort((List<Comparable>) items);
     return items;
   }
+  
+  public int hIndex() {
+    int[] c = new int[counts.size()];
+    int i = 0;
+    for (int ci : counts.values())
+      c[i++] = ci;
+    Arrays.sort(c);
+    for (int h = 1; h <= c.length; h++)
+      if (c[c.length-h] < h)
+        return h-1;
+    return c.length;
+  }
 
   public List<T> getKeysSortedByCount(final boolean descending) {
     List<T> items = new ArrayList<>();
@@ -253,5 +266,19 @@ public class Counts<T> implements Serializable {
         return getCount(arg0) - getCount(arg1);
       }
     };
+  }
+  
+  public static void main(String[] args) {
+    Counts<String> c = new Counts<>();
+    for (int i = 0; i < 4; i++)
+      c.increment("a");
+    for (int i = 0; i < 4; i++)
+      c.increment("b");
+    for (int i = 0; i < 1; i++)
+      c.increment("c");
+    for (int i = 0; i < 1; i++)
+      c.increment("d");
+    System.out.println(c);
+    System.out.println(c.hIndex());
   }
 }

@@ -18,6 +18,16 @@ public class ReservoirSample<T> implements Iterable<T> {
     this.k = k;
     this.n = 0;
   }
+
+  public ReservoirSample(int k, Random rand, Iterable<T> items) {
+    this(k, rand, items.iterator());
+  }
+
+  public ReservoirSample(int k, Random rand, Iterator<T> items) {
+    this(k, rand);
+    while (items.hasNext())
+      add(items.next());
+  }
   
   public boolean add(T item) {
     n++;
@@ -31,6 +41,12 @@ public class ReservoirSample<T> implements Iterable<T> {
       return true;
     }
     return false;
+  }
+  
+  public List<T> toList() {
+    List<T> all = new ArrayList<>();
+    all.addAll(reservoir);
+    return all;
   }
   
   public T get(int i) {
