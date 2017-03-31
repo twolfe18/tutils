@@ -145,6 +145,24 @@ public class FileUtil {
     return output;
   }
 
+  public static ArrayList<File> findDirs(File parent, String glob) {
+    ArrayList<File> output = new ArrayList<>();
+    PathMatcher pm = FileSystems.getDefault().getPathMatcher(glob);
+    try {
+      Files.walkFileTree(parent.toPath(), new SimpleFileVisitor<Path>() {
+        @Override
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+          if (pm.matches(dir))
+            output.add(dir.toFile());
+          return FileVisitResult.CONTINUE;
+        }
+      });
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return output;
+  }
+
   public static void copy(File sourceFile, File destFile) throws IOException {
     if (!destFile.exists())
       destFile.createNewFile();
