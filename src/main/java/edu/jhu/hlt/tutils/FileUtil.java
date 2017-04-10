@@ -116,6 +116,32 @@ public class FileUtil {
       throw new RuntimeException(e);
     }
   }
+  
+  /**
+   * Calls /usr/bin/find
+   * @param dir is the directory to search.
+   * @param findArguments should be things like ["-name", "*.txt", "-size", "+1M"] etc
+   */
+  public static List<File> execFind(File dir, String... findArguments) throws InterruptedException, IOException {
+    String[] cmd = new String[findArguments.length + 2];
+    cmd[0] = "/usr/bin/find";
+    cmd[1] = dir.getPath();
+    System.arraycopy(findArguments, 0, cmd, 2, findArguments.length);
+    ProcessBuilder pb = new ProcessBuilder(cmd);
+    Process p = pb.start();
+    InputStreamGobbler stdout = new InputStreamGobbler(p.getInputStream());
+    InputStreamGobbler stderr = new InputStreamGobbler(p.getErrorStream());
+    stdout.start();
+    stderr.start();
+    int r = p.waitFor();
+    if (r != 0)
+      throw new RuntimeException("ret=" + r);
+    List<String> files = stdout.getLines();
+    List<File> ret = new ArrayList<>();
+    for (String f : files)
+      ret.add(new File(f));
+    return ret;
+  }
 
   /**
    * @param parent is the directory to search in.
@@ -255,8 +281,13 @@ public class FileUtil {
       throw new RuntimeException(e);
     }
   }
+  
+  static void findTest() throws Exception {
+    List<File> fs = execFind(new File("/home/travis/code/fnparse"), "-type", "f", "-size", "+1M", "-name", "*.gz");
+    System.out.println("found " + fs.size() + " files");
+  }
 
-  public static void main(String[] args) throws IOException {
+  static void compressionTest(String[] args) throws IOException {
     if (args.length != 3) {
       System.err.println("please provide:");
       System.err.println("1) an input file");
@@ -288,5 +319,10 @@ public class FileUtil {
         w.write(line + "\n");
     }
     Log.info("done");
+  }
+
+  public static void main(String[] args) throws Exception {
+//    compressionTest(args);
+    findTest();
   }
 }
