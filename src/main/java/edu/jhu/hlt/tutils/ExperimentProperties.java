@@ -135,6 +135,8 @@ public class ExperimentProperties extends java.util.Properties {
 
   public int getInt(String key) {
     String value = getProperty(key);
+    if (value == null)
+      throw new RuntimeException("int property not provided: "  + key);
     try {
       return Integer.parseInt(value);
     } catch (NumberFormatException nfe) {
@@ -157,6 +159,8 @@ public class ExperimentProperties extends java.util.Properties {
 
   public double getDouble(String key) {
     String value = getProperty(key);
+    if (value == null)
+      throw new RuntimeException("double property not provided: "  + key);
     try {
       return Double.parseDouble(value);
     } catch (NumberFormatException nfe) {
