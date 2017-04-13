@@ -136,6 +136,7 @@ public class FileUtil {
     int r = p.waitFor();
     if (r != 0)
       throw new RuntimeException("ret=" + r);
+    stdout.join();
     List<String> files = stdout.getLines();
     List<File> ret = new ArrayList<>();
     for (String f : files)
