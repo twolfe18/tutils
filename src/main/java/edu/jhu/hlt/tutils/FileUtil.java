@@ -22,6 +22,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -142,6 +143,23 @@ public class FileUtil {
     for (String f : files)
       ret.add(new File(f));
     return ret;
+  }
+
+  public static List<File> execFindEx1(File dir, String... findArguments) {
+    try {
+      return execFind(dir, findArguments);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static List<File> execFindEx2(File dir, String... findArguments) {
+    try {
+      return execFind(dir, findArguments);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return Collections.emptyList();
+    }
   }
 
   /**
