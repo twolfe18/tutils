@@ -272,6 +272,18 @@ Z(4) = 4*3/2 = 6
   public boolean includes(int wordIdx) {
     return start <= wordIdx && wordIdx < end;
   }
+  
+  /**
+   * returns -1 if they overlap
+   */
+  public static int distance(Span a, Span b) {
+    if (a.overlaps(b))
+      return -1;
+    if (a.end <= b.start)
+      return b.start - a.end;
+    else
+      return a.start - b.end;
+  }
 
   public String toString() {
     return String.format("<Span %d-%d>", start, end);
