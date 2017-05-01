@@ -270,9 +270,12 @@ public class FileUtil {
   }
 
   public static Object deserialize(File f) {
+    return deserialize(f, false);
+  }
+  public static Object deserialize(File f, boolean quiet) {
     if (VERBOSE)
       Log.info("reading from " + f.getPath());
-    long s = System.currentTimeMillis();
+    long s = quiet ? 0 : System.currentTimeMillis();
     Object out = null;
     try (FileInputStream fis = new FileInputStream(f);
         ObjectInputStream oos = f.getName().toLowerCase().endsWith(".gz")
@@ -282,8 +285,10 @@ public class FileUtil {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    double sec = (System.currentTimeMillis() - s) / 1000d;
-    Log.info(String.format("took %.2f sec to read from %s", sec, f.getPath()));
+    if (!quiet) {
+      double sec = (System.currentTimeMillis() - s) / 1000d;
+      Log.info(String.format("took %.2f sec to read from %s", sec, f.getPath()));
+    }
     return out;
   }
 
