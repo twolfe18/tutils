@@ -1,0 +1,34 @@
+stages:
+  - build-unit-test
+#   - deploy
+
+compile:
+  stage: build-unit-test
+  image: r8n01:5000/coe-maven:latest
+  script:
+    - git clone https://github.com/mgormley/prim.git
+    - cd prim
+    - mvn install -B -DskipTests
+    - cd -
+    - mvn compile -B
+    - rm -rf prim
+    - mvn clean -B
+  tags:
+    - docker
+
+# deploy:
+#   stage: deploy
+#   image: r8n01:5000/coe-maven:latest
+#   script:
+#     - git clone https://github.com/mgormley/prim.git
+#     - cd prim
+#     - mvn install -B -DskipTests
+#     - cd -
+#     - mvn clean deploy -B -Denforcer.skip=true -DskipTests
+#     - rm -rf prim
+#     - mvn clean -B
+#   tags:
+#     - docker
+#   only:
+#     - add-ci
+#     - master
