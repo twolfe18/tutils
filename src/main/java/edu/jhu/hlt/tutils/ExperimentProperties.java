@@ -216,28 +216,28 @@ public class ExperimentProperties extends java.util.Properties {
   public File getExistingDir(String key, File defaultValue) {
     File f = getFile(key, defaultValue);
     if (!f.isDirectory())
-      throw new RuntimeException("ExistingDir is not dir: " + f.getPath());
+      throw new RuntimeException("ExistingDir is not dir key=" + key + " value=" + f.getPath());
     return f;
   }
 
   public File getExistingDir(String key) {
     File f = getFile(key);
     if (!f.isDirectory())
-      throw new RuntimeException("ExistingDir is not dir: " + f.getPath());
+      throw new RuntimeException("ExistingDir is not dir key=" + key + " value=" + f.getPath());
     return f;
   }
 
   public File getExistingFile(String key, File defaultValue) {
     File f = getFile(key, defaultValue);
     if (!f.isFile())
-      throw new RuntimeException("ExistingFile is not file: " + f.getPath());
+      throw new RuntimeException("ExistingFile is not file key=" + key + " value=" + f.getPath());
     return f;
   }
 
   public File getExistingFile(String key) {
     File f = getFile(key);
     if (!f.isFile())
-      throw new RuntimeException("ExistingFile is not file: " + f.getPath());
+      throw new RuntimeException("ExistingFile is not file key=" + key + " value=" + f.getPath());
     return f;
   }
 

@@ -31,6 +31,7 @@ import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 
 import edu.jhu.prim.list.DoubleArrayList;
+import edu.jhu.prim.tuple.Pair;
 
 public class FileUtil {
   public static boolean VERBOSE = false;
@@ -40,6 +41,21 @@ public class FileUtil {
       for (String l : lines) {
         w.write(l);
         w.newLine();
+      }
+    }
+  }
+  
+  public static void getLinesAsWcDashLFormat(File f, List<Pair<String, Integer>> add1, List<String> add2) throws IOException {
+    try (BufferedReader r = getReader(f)) {
+      for (String line = r.readLine(); line != null; line = r.readLine()) {
+        line = line.trim();
+        String[] toks = line.split("\\s+", 2);
+        if (add1 != null) {
+          int c = Integer.parseInt(toks[0]);
+          add1.add(new Pair<>(toks[1], c));
+        }
+        if (add2 != null)
+          add2.add(toks[1]);
       }
     }
   }

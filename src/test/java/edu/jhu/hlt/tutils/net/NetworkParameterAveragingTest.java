@@ -11,7 +11,7 @@ public class NetworkParameterAveragingTest {
 
   double tol = 1e-8;
 
-  @Test
+  //@Test
   public void test0() throws Exception {
     int dim = 10;
     int numClients = 12;
