@@ -6,12 +6,7 @@ compile:
   stage: build-unit-test
   image: r8n01:5000/coe-maven:latest
   script:
-    - git clone https://github.com/mgormley/prim.git
-    - cd prim
-    - mvn install -B -DskipTests
-    - cd -
     - mvn test -B
-    - rm -rf prim
     - mvn clean -B
   tags:
     - docker
