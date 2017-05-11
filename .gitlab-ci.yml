@@ -10,7 +10,7 @@ compile:
     - cd prim
     - mvn install -B -DskipTests
     - cd -
-    - mvn compile -B
+    - mvn test -B
     - rm -rf prim
     - mvn clean -B
   tags:
