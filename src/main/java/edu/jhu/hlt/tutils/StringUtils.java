@@ -108,6 +108,16 @@ public class StringUtils {
     return s.substring(0, maxLength-3) + "...";
   }
 
+  public static String trimPrettyWithWordsRemoved(String s, int maxLength) {
+    if (s.length() <= maxLength)
+      return s;
+    // Find the last whitespace before the cutoff
+    int l = s.lastIndexOf(' ', maxLength);
+    String suf = s.substring(l);
+    String[] suft = suf.split("\\s+");
+    return s.substring(0, l) + "... and " + suft.length + " more words";
+  }
+
   public static void main(String[] args) {
     List<String> ss = new ArrayList<>();
     ss.addAll(Arrays.asList("foo", "abc", "", "a", "zz", "zzz", "_z", "z_", "p_2", "p_1", "p_22"));
