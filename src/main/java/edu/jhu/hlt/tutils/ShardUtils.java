@@ -2,6 +2,7 @@ package edu.jhu.hlt.tutils;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.function.ToIntFunction;
 
 public class ShardUtils {
@@ -33,6 +34,23 @@ public class ShardUtils {
 
     public boolean matches(Object hashable) {
       return matches(hashable.hashCode());
+    }
+    
+    public <T> List<T> filterByHash(List<T> listOfHashables) {
+      List<T> a = new ArrayList<>();
+      for (T t : listOfHashables)
+        if (matches(t))
+          a.add(t);
+      return a;
+    }
+
+    public <T> List<T> filterByIndex(List<T> list) {
+      List<T> a = new ArrayList<>();
+      int n = list.size();
+      for (int i = 0; i < n; i++)
+        if (matches(i))
+          a.add(list.get(i));
+      return a;
     }
   }
 
