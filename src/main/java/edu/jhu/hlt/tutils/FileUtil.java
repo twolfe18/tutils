@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -58,6 +59,21 @@ public class FileUtil {
           add2.add(toks[1]);
       }
     }
+  }
+  
+  public static Map<String, String> getLinesAsTwoColTsv(File f, Map<String, String> addTo, boolean keyThenValue, boolean checkDupKeys) throws IOException {
+    try (BufferedReader r = getReader(f)) {
+      for (String line = r.readLine(); line != null; line = r.readLine()) {
+        String[] a = line.split("\t", 2);
+        String key = keyThenValue ? a[0] : a[1];
+        String val = keyThenValue ? a[1] : a[0];
+        Object old = addTo.put(key, val);
+        if (checkDupKeys && old != null) {
+          throw new RuntimeException("key=" + key + " has two values, old=" + old + " and new=" + val);
+        }
+      }
+    }
+    return addTo;
   }
 
   public static List<String> getLines(File f) {
