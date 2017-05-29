@@ -214,6 +214,10 @@ Z(4) = 4*3/2 = 6
   }
 
   public int width() { return end - start; }
+  
+  public static Span shift(Span s, int amount) {
+    return getSpan(s.start+amount, s.end+amount);
+  }
 
   /**
    * return true if this span is to the left of
