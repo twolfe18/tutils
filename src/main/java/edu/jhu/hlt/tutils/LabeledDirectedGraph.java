@@ -673,6 +673,23 @@ public class LabeledDirectedGraph implements Serializable {
     }
     return null;
   }
+  
+  /**
+   * Uses 0-indexes for tokens with n as root/wall (where n is the length of the
+   * sentence).
+   */
+  public static LabeledDirectedGraph fromConllx(List<String[]> conllx, MultiAlphabet a) {
+    int n = conllx.size();
+    Builder b = new LabeledDirectedGraph().new Builder();
+    for (String[] row : conllx) {
+      int m = Integer.parseInt(row[0]) - 1;
+      int h = Integer.parseInt(row[6]) - 1;
+      if (h < 0) h = n;
+      int e = a.dep(row[7]);
+      b.add(h, m, e);
+    }
+    return b.freeze();
+  }
 
   /**
    * Uses 0-indexes for tokens with n as root/wall (where n is the length of the
