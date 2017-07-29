@@ -1,5 +1,6 @@
 package edu.jhu.hlt.tutils;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -310,9 +311,10 @@ public class FileUtil {
     long s = quiet ? 0 : System.currentTimeMillis();
     Object out = null;
     try (FileInputStream fis = new FileInputStream(f);
-        ObjectInputStream oos = f.getName().toLowerCase().endsWith(".gz")
-            ? new ObjectInputStream(new GZIPInputStream(fis))
-            : new ObjectInputStream(fis)) {
+        BufferedInputStream is = new BufferedInputStream(fis);
+        InputStream dis = f.getName().toLowerCase().endsWith(".gz") ? new GZIPInputStream(is) : is;
+        BufferedInputStream bdis = new BufferedInputStream(dis);
+        ObjectInputStream oos = new ObjectInputStream(bdis)) {
       out = oos.readObject();
     } catch (Exception e) {
       throw new RuntimeException(e);
